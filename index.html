@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Тихие холмы</title>
+<meta name="description" content="Спокойная чёрно-белая игра: холмы, монеты и шахты в долине.">
+<meta name="theme-color" content="#f4f2ee">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23f4f2ee'/%3E%3Cpath d='M0 24 Q8 12 16 20 T32 16 L32 32 L0 32 Z' fill='%231c1b19'/%3E%3Ccircle cx='22' cy='9' r='4' fill='none' stroke='%231c1b19' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="theme-paper">
+
+<canvas id="scene"></canvas>
+
+<header id="top">
+  <div class="res"><i class="ic coin"></i><b id="coins">0</b></div>
+  <div class="res"><i class="ic ore"></i><b id="ore">0</b></div>
+  <div class="spacer"></div>
+  <button id="btn-sound" class="icon-btn" title="Музыка" aria-label="Музыка">&#9834;</button>
+  <button id="btn-settings" class="icon-btn" title="Настройки" aria-label="Настройки">&#9776;</button>
+</header>
+
+<button id="pending" hidden></button>
+
+<nav id="base-bar">
+  <button id="btn-garage" class="btn">Гараж</button>
+  <button id="btn-ride" class="btn main">Поехать</button>
+  <button id="btn-shop" class="btn">Магазин</button>
+</nav>
+
+<div id="ride-hud" hidden>
+  <div id="ride-top">
+    <div id="fuel-wrap"><i id="fuel-bar"></i></div>
+    <div id="ride-stats"><span id="dist">0 м</span><span class="dot">·</span><i class="ic coin"></i><span id="run-coins">0</span></div>
+    <button id="btn-pause" class="icon-btn" title="Пауза" aria-label="Пауза">&#10073;&#10073;</button>
+  </div>
+  <div id="pedals">
+    <button id="pedal-brake" class="pedal" aria-label="Тормоз">&#9664;</button>
+    <button id="pedal-gas" class="pedal" aria-label="Газ">&#9654;</button>
+  </div>
+</div>
+
+<div id="modal" hidden>
+  <div class="sheet">
+    <header><h2 id="modal-title"></h2><button id="modal-close" aria-label="Закрыть">&times;</button></header>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="js/data.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/terrain.js"></script>
+<script src="js/vehicle.js"></script>
+<script src="js/ride.js"></script>
+<script src="js/base.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

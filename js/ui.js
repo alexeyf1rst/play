@@ -1,0 +1,533 @@
+/* ============================================================
+   Интерфейс: окна, списки, кнопки.
+   ============================================================ */
+window.HC = window.HC || {};
+(function (HC) {
+  'use strict';
+
+  var G = null;           // ссылка на игру
+  var current = null;     // открытая панель (чтобы перерисовывать после покупки)
+  var el = {};
+
+  function $(id) { return document.getElementById(id); }
+  function money(n) { return HC.fmt(n); }
+  function can(cost, ore) {
+    var s = G.state;
+    return s.coins >= (cost || 0) && s.ore >= (ore || 0);
+  }
+  function pay(cost, ore) {
+    if (!can(cost, ore)) { HC.Audio.deny(); UI.toast('Не хватает'); return false; }
+    G.state.coins -= (cost || 0);
+    G.state.ore -= (ore || 0);
+    return true;
+  }
+  function priceTag(cost, ore) {
+    var out = '<span class="price' + (can(cost, ore) ? '' : ' short') + '">';
+    if (cost) out += '<i class="ic coin"></i>' + money(cost);
+    if (ore) out += '<i class="ic ore"></i>' + money(ore);
+    if (!cost && !ore) out += 'бесплатно';
+    return out + '</span>';
+  }
+
+  var UI = {
+    init: function (game) {
+      G = game;
+      ['coins', 'ore', 'modal', 'modal-title', 'modal-body', 'toast', 'pending',
+       'ride-hud', 'fuel-bar', 'dist', 'run-coins', 'base-bar', 'top'].forEach(function (id) {
+        el[id] = $(id);
+      });
+
+      $('modal-close').addEventListener('click', function () { UI.close(); });
+      el.modal.addEventListener('click', function (e) { if (e.target === el.modal) UI.close(); });
+
+      $('btn-ride').addEventListener('click', function () { HC.Audio.click(); UI.openTracks(); });
+      $('btn-garage').addEventListener('click', function () { HC.Audio.click(); UI.openGarage(); });
+      $('btn-shop').addEventListener('click', function () { HC.Audio.click(); UI.openShop(); });
+      $('btn-settings').addEventListener('click', function () { HC.Audio.click(); UI.openSettings(); });
+      $('btn-sound').addEventListener('click', function () {
+        var s = G.state.settings;
+        s.music = !s.music;
+        HC.Audio.applySettings(s);
+        UI.syncSound();
+        HC.save(G.state, true);
+      });
+      el.pending.addEventListener('click', function () {
+        var got = HC.Economy.collect(G.state);
+        if (got.coins || got.ore) {
+          HC.Audio.build();
+          UI.toast('Собрано: ' + money(got.coins) + ' монет' + (got.ore ? ', ' + money(got.ore) + ' руды' : ''));
+        }
+        UI.refreshTop();
+        HC.save(G.state, true);
+      });
+      this.syncSound();
+    },
+
+    /* --- Мелочи ------------------------------------------- */
+    toast: function (msg) {
+      el.toast.textContent = msg;
+      el.toast.classList.add('show');
+      clearTimeout(this._tt);
+      this._tt = setTimeout(function () { el.toast.classList.remove('show'); }, 2200);
+    },
+
+    syncSound: function () {
+      $('btn-sound').textContent = G.state.settings.music ? '♪' : '♪̸';
+      $('btn-sound').classList.toggle('off', !G.state.settings.music);
+    },
+
+    refreshTop: function () {
+      el.coins.textContent = money(G.state.coins);
+      el.ore.textContent = money(G.state.ore);
+    },
+
+    /* Пузырь с накопленной добычей */
+    refreshPending: function () {
+      var p = G.state.base.pending;
+      var cap = HC.Economy.capacity(G.state);
+      var c = Math.floor(p.coins), o = Math.floor(p.ore);
+      if (G.scene !== 'base' || (c < 1 && o < 1)) { el.pending.hidden = true; return; }
+      el.pending.hidden = false;
+      var full = c >= cap.coins || (o >= cap.ore && cap.ore > 0);
+      el.pending.className = full ? 'full' : '';
+      el.pending.innerHTML = '<b>Собрать</b><span><i class="ic coin"></i>' + money(c) +
+        (o ? ' <i class="ic ore"></i>' + money(o) : '') + '</span>' +
+        (full ? '<em>склад полон</em>' : '');
+    },
+
+    /* --- Окна --------------------------------------------- */
+    open: function (panel) {
+      current = panel;
+      this.render();
+      el.modal.hidden = false;
+    },
+    close: function () {
+      el.modal.hidden = true;
+      current = null;
+      if (UI.onClose) { var f = UI.onClose; UI.onClose = null; f(); }
+    },
+    render: function () {
+      if (!current) return;
+      var p = current();
+      el['modal-title'].textContent = p.title;
+      el['modal-body'].innerHTML = p.html;
+      if (p.bind) p.bind(el['modal-body']);
+      this.refreshTop();
+    },
+    refresh: function () {
+      this.render();
+      this.refreshTop();
+      this.refreshPending();
+    },
+
+    /* --- Выбор трассы ------------------------------------- */
+    openTracks: function () {
+      this.open(function () {
+        var s = G.state;
+        var ids = Object.keys(HC.TRACKS).sort(function (a, b) { return HC.TRACKS[a].order - HC.TRACKS[b].order; });
+        var html = '<p class="lead">Куда поедем? Заезд заканчивается, когда кончается топливо — или когда сам решишь.</p>';
+        ids.forEach(function (id) {
+          var t = HC.TRACKS[id];
+          var owned = !!s.tracks[id];
+          var best = s.stats.best[id] || 0;
+          html += '<div class="card' + (owned ? '' : ' locked') + '">' +
+            '<div class="card-main"><h3>' + t.name + '</h3><p>' + t.about + '</p>' +
+            '<p class="muted">награда ×' + t.payout.toFixed(2) +
+            (best ? ' · рекорд ' + best + ' м' : '') + '</p></div>' +
+            '<div class="card-side">' +
+            (owned
+              ? '<button class="btn main" data-go="' + id + '">Поехать</button>'
+              : '<button class="btn" data-buy-track="' + id + '" ' + (can(t.price, t.priceOre) ? '' : 'disabled') + '>Открыть</button>' + priceTag(t.price, t.priceOre)) +
+            '</div></div>';
+        });
+        return {
+          title: 'Маршруты', html: html,
+          bind: function (root) {
+            root.querySelectorAll('[data-go]').forEach(function (b) {
+              b.addEventListener('click', function () {
+                HC.Audio.click();
+                UI.close();
+                G.startRide(b.getAttribute('data-go'));
+              });
+            });
+            root.querySelectorAll('[data-buy-track]').forEach(function (b) {
+              b.addEventListener('click', function () {
+                var id = b.getAttribute('data-buy-track'), t = HC.TRACKS[id];
+                if (!pay(t.price, t.priceOre)) return;
+                G.state.tracks[id] = true;
+                HC.Audio.build();
+                UI.toast('Открыт маршрут: ' + t.name);
+                HC.save(G.state, true);
+                UI.refresh();
+              });
+            });
+          }
+        };
+      });
+    },
+
+    /* --- Гараж -------------------------------------------- */
+    openGarage: function () {
+      this.open(function () {
+        var s = G.state;
+        var vid = s.vehicle, v = HC.VEHICLES[vid];
+        var disc = HC.Economy.workshopDiscount(s);
+        var html = '<p class="lead">Прокачка машины <b>' + v.name + '</b>. У каждой машины она своя.' +
+          (disc > 0 ? ' Мастерская даёт скидку ' + Math.round(disc * 100) + '%.' : '') + '</p>';
+        Object.keys(HC.UPGRADES).forEach(function (uid) {
+          var u = HC.UPGRADES[uid];
+          var lvl = s.up[vid][uid] | 0;
+          var maxed = lvl >= u.max;
+          var cost = maxed ? 0 : HC.upCostOf(u, lvl, disc);
+          var ore = maxed ? 0 : HC.upOreCostOf(u, lvl);
+          var pct = Math.round(lvl / u.max * 100);
+          html += '<div class="card"><div class="card-main">' +
+            '<h3>' + u.name + ' <span class="lvl">' + lvl + ' / ' + u.max + '</span></h3>' +
+            '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+            '<p>' + u.about + '</p></div>' +
+            '<div class="card-side">' +
+            (maxed ? '<span class="done">максимум</span>'
+                   : '<button class="btn" data-up="' + uid + '" ' + (can(cost, ore) ? '' : 'disabled') + '>Улучшить</button>' + priceTag(cost, ore)) +
+            '</div></div>';
+        });
+        return {
+          title: 'Гараж', html: html,
+          bind: function (root) {
+            root.querySelectorAll('[data-up]').forEach(function (b) {
+              b.addEventListener('click', function () {
+                var uid = b.getAttribute('data-up'), u = HC.UPGRADES[uid];
+                var lvl = G.state.up[G.state.vehicle][uid] | 0;
+                if (lvl >= u.max) return;
+                var d = HC.Economy.workshopDiscount(G.state);
+                if (!pay(HC.upCostOf(u, lvl, d), HC.upOreCostOf(u, lvl))) return;
+                G.state.up[G.state.vehicle][uid] = lvl + 1;
+                HC.Audio.build();
+                HC.save(G.state, true);
+                UI.refresh();
+              });
+            });
+          }
+        };
+      });
+    },
+
+    /* --- Магазин: машины и участки ------------------------ */
+    openShop: function () {
+      this.open(function () {
+        var s = G.state;
+        var ids = Object.keys(HC.VEHICLES).sort(function (a, b) { return HC.VEHICLES[a].order - HC.VEHICLES[b].order; });
+        var html = '<p class="lead">Машины. Купленное остаётся навсегда, прокачка у каждой своя.</p>';
+        ids.forEach(function (id) {
+          var v = HC.VEHICLES[id];
+          var owned = !!s.owned[id];
+          var active = s.vehicle === id;
+          html += '<div class="card' + (owned ? '' : ' locked') + '">' +
+            '<div class="card-main"><h3>' + v.name + '</h3><p>' + v.about + '</p>' +
+            '<p class="muted">бак ' + v.fuel + ' · тяга ' + Math.round(v.power / 1000) + ' · масса ' + v.mass + '</p></div>' +
+            '<div class="card-side">' +
+            (active ? '<span class="done">выбрана</span>'
+              : owned ? '<button class="btn main" data-pick="' + id + '">Выбрать</button>'
+              : '<button class="btn" data-buy-car="' + id + '" ' + (can(v.price, v.priceOre) ? '' : 'disabled') + '>Купить</button>' + priceTag(v.price, v.priceOre)) +
+            '</div></div>';
+        });
+
+        var cost = HC.Economy.plotCost(s);
+        var left = HC.PLOTS.spots.length - s.base.unlocked;
+        html += '<h4 class="sec">Участки под постройки</h4>' +
+          '<div class="card"><div class="card-main"><h3>Новый участок</h3>' +
+          '<p>' + (left > 0 ? 'Свободных мест в долине: ' + left + '.' : 'Вся долина застроена.') + '</p></div>' +
+          '<div class="card-side">' +
+          (left > 0 ? '<button class="btn" data-plot ' + (can(cost, 0) ? '' : 'disabled') + '>Расчистить</button>' + priceTag(cost, 0)
+                    : '<span class="done">всё занято</span>') +
+          '</div></div>';
+
+        return {
+          title: 'Магазин', html: html,
+          bind: function (root) {
+            root.querySelectorAll('[data-pick]').forEach(function (b) {
+              b.addEventListener('click', function () {
+                G.state.vehicle = b.getAttribute('data-pick');
+                HC.Audio.click(); HC.save(G.state, true); UI.refresh();
+              });
+            });
+            root.querySelectorAll('[data-buy-car]').forEach(function (b) {
+              b.addEventListener('click', function () {
+                var id = b.getAttribute('data-buy-car'), v = HC.VEHICLES[id];
+                if (!pay(v.price, v.priceOre)) return;
+                G.state.owned[id] = true;
+                G.state.vehicle = id;
+                G.state.up[id] = G.state.up[id] || {};
+                HC.Audio.build();
+                UI.toast('Куплена ' + v.name);
+                HC.save(G.state, true); UI.refresh();
+              });
+            });
+            var pb = root.querySelector('[data-plot]');
+            if (pb) pb.addEventListener('click', function () {
+              if (!pay(HC.Economy.plotCost(G.state), 0)) return;
+              G.state.base.unlocked++;
+              HC.Audio.build();
+              UI.toast('Участок расчищен');
+              HC.save(G.state, true); UI.refresh();
+            });
+          }
+        };
+      });
+    },
+
+    /* --- Участок на базе ---------------------------------- */
+    openPlot: function (index) {
+      this.open(function () {
+        var s = G.state, plot = s.base.plots[index];
+        var html = '', title;
+
+        if (!plot) {
+          title = 'Пустой участок';
+          html = '<p class="lead">Что здесь построить?</p>';
+          Object.keys(HC.BUILDINGS).forEach(function (bid) {
+            var d = HC.BUILDINGS[bid];
+            var cost = HC.costOf(d, 0), ore = HC.oreCostOf(d, 0);
+            html += '<div class="card"><div class="card-main"><h3>' + d.name + '</h3><p>' + d.about + '</p>' +
+              '<p class="muted">' + UI.buildingEffect(bid, 1) + '</p></div>' +
+              '<div class="card-side"><button class="btn" data-build="' + bid + '" ' + (can(cost, ore) ? '' : 'disabled') + '>Построить</button>' +
+              priceTag(cost, ore) + '</div></div>';
+          });
+        } else {
+          var d = HC.BUILDINGS[plot.type];
+          title = d.name + ' · уровень ' + plot.level;
+          var maxed = plot.level >= d.max;
+          var cost = maxed ? 0 : HC.costOf(d, plot.level);
+          var ore = maxed ? 0 : HC.oreCostOf(d, plot.level);
+          html = '<p class="lead">' + d.about + '</p>' +
+            '<div class="stat"><span>сейчас</span><b>' + UI.buildingEffect(plot.type, plot.level) + '</b></div>' +
+            (maxed ? '' : '<div class="stat"><span>станет</span><b>' + UI.buildingEffect(plot.type, plot.level + 1) + '</b></div>') +
+            '<div class="card"><div class="card-main"><h3>' + (maxed ? 'Дальше некуда' : 'Улучшить до ' + (plot.level + 1)) + '</h3>' +
+            '<div class="bar"><i style="width:' + Math.round(plot.level / d.max * 100) + '%"></i></div></div>' +
+            '<div class="card-side">' +
+            (maxed ? '<span class="done">максимум</span>'
+                   : '<button class="btn main" data-upg ' + (can(cost, ore) ? '' : 'disabled') + '>Улучшить</button>' + priceTag(cost, ore)) +
+            '</div></div>' +
+            '<button class="btn ghost wide" data-demolish>Разобрать (вернётся половина вложенного)</button>';
+        }
+        return {
+          title: title, html: html,
+          bind: function (root) {
+            root.querySelectorAll('[data-build]').forEach(function (b) {
+              b.addEventListener('click', function () {
+                var bid = b.getAttribute('data-build'), d = HC.BUILDINGS[bid];
+                if (!pay(HC.costOf(d, 0), HC.oreCostOf(d, 0))) return;
+                G.state.base.plots[index] = { type: bid, level: 1 };
+                HC.Audio.build();
+                UI.toast(d.name + ' построена');
+                HC.save(G.state, true);
+                UI.refresh();
+              });
+            });
+            var ub = root.querySelector('[data-upg]');
+            if (ub) ub.addEventListener('click', function () {
+              var p = G.state.base.plots[index], d = HC.BUILDINGS[p.type];
+              if (p.level >= d.max) return;
+              if (!pay(HC.costOf(d, p.level), HC.oreCostOf(d, p.level))) return;
+              p.level++;
+              HC.Audio.build();
+              HC.save(G.state, true);
+              UI.refresh();
+            });
+            var db = root.querySelector('[data-demolish]');
+            if (db) db.addEventListener('click', function () {
+              var p = G.state.base.plots[index], d = HC.BUILDINGS[p.type];
+              if (!window.confirm('Разобрать ' + d.name + '? Вернётся половина вложенного.')) return;
+              var back = 0, backOre = 0;
+              for (var l = 0; l < p.level; l++) { back += HC.costOf(d, l); backOre += HC.oreCostOf(d, l); }
+              G.state.coins += Math.floor(back / 2);
+              G.state.ore += Math.floor(backOre / 2);
+              G.state.base.plots[index] = null;
+              HC.Audio.click();
+              UI.toast('Вернулось ' + money(Math.floor(back / 2)) + ' монет');
+              HC.save(G.state, true);
+              UI.close();
+            });
+          }
+        };
+      });
+    },
+
+    buildingEffect: function (type, level) {
+      var d = HC.BUILDINGS[type];
+      if (type === 'mine') return '+' + HC.fmt1(HC.Economy.buildingRate('mine', level)) + ' монет в минуту';
+      if (type === 'drill') return '+' + HC.fmt1(HC.Economy.buildingRate('drill', level)) + ' руды в минуту';
+      if (type === 'storage') return '+' + money(d.capCoins * Math.pow(d.capMult, level - 1)) + ' к складу монет';
+      if (type === 'windmill') return '+' + Math.round(d.bonus * level * 100) + '% ко всей добыче';
+      if (type === 'workshop') return '−' + Math.round(d.discount * level * 100) + '% к цене прокачки, +' + Math.round(d.ridebonus * level * 100) + '% монет с заездов';
+      if (type === 'garden') return '+' + HC.fmt1(d.offline * level) + ' ч к копилке офлайна';
+      return '';
+    },
+
+    /* --- Результат заезда --------------------------------- */
+    showResults: function (r) {
+      this.open(function () {
+        var html = '<p class="lead">' + r.reason + (r.record ? ' · новый рекорд!' : '') + '</p>' +
+          '<div class="result"><div class="big">' + r.distance + ' <small>м</small></div>' +
+          '<div class="muted">лучший результат ' + r.best + ' м · ' + HC.fmtTime(r.time) + '</div></div>' +
+          '<div class="stat"><span>монеты на трассе</span><b>' + money(r.coinsRaw) + '</b></div>' +
+          '<div class="stat"><span>за расстояние</span><b>' + money(r.distCoins) + '</b></div>' +
+          (r.bonus ? '<div class="stat"><span>бонус за рекорд</span><b>' + money(r.bonus) + '</b></div>' : '') +
+          (r.flips ? '<div class="stat"><span>сальто</span><b>' + r.flips + '</b></div>' : '') +
+          (r.ore ? '<div class="stat"><span>руда</span><b>' + money(r.ore) + '</b></div>' : '') +
+          '<div class="stat total"><span>всего монет</span><b>' + money(r.total) + '</b></div>' +
+          '<div class="row"><button class="btn main wide" data-again>Ещё заезд</button>' +
+          '<button class="btn wide" data-home>На базу</button></div>';
+        return {
+          title: 'Заезд окончен', html: html,
+          bind: function (root) {
+            root.querySelector('[data-again]').addEventListener('click', function () {
+              HC.Audio.click(); UI.close(); G.startRide(G.lastTrack);
+            });
+            root.querySelector('[data-home]').addEventListener('click', function () {
+              HC.Audio.click(); UI.close(); G.goBase();
+            });
+          }
+        };
+      });
+    },
+
+    /* --- Пока тебя не было -------------------------------- */
+    showOffline: function (info) {
+      this.open(function () {
+        return {
+          title: 'Пока тебя не было', html:
+            '<p class="lead">Прошло ' + HC.fmtTime(info.seconds) + '. Шахты работали' +
+            (info.capped ? ', но склад заполнился и часть пропала — расширь склад или заходи почаще.' : '.') + '</p>' +
+            '<div class="stat"><span>накопилось монет</span><b>' + money(Math.floor(G.state.base.pending.coins)) + '</b></div>' +
+            (G.state.base.pending.ore >= 1 ? '<div class="stat"><span>руды</span><b>' + money(Math.floor(G.state.base.pending.ore)) + '</b></div>' : '') +
+            '<div class="row"><button class="btn main wide" data-take>Забрать</button></div>',
+          bind: function (root) {
+            root.querySelector('[data-take]').addEventListener('click', function () {
+              var got = HC.Economy.collect(G.state);
+              HC.Audio.build();
+              UI.toast('Собрано ' + money(got.coins) + ' монет');
+              HC.save(G.state, true);
+              UI.close(); UI.refreshTop(); UI.refreshPending();
+            });
+          }
+        };
+      });
+    },
+
+    /* --- Настройки и сейвы -------------------------------- */
+    openSettings: function () {
+      this.open(function () {
+        var s = G.state, st = s.stats, set = s.settings;
+        var r = HC.Economy.rates(s), cap = HC.Economy.capacity(s);
+        var html =
+          '<h4 class="sec">Звук</h4>' +
+          '<label class="row switch"><span>Музыка</span><input type="checkbox" id="set-music" ' + (set.music ? 'checked' : '') + '></label>' +
+          '<label class="row slider"><span>Громкость</span><input type="range" id="set-mvol" min="0" max="100" value="' + Math.round(set.musicVol * 100) + '"></label>' +
+          '<label class="row switch"><span>Звуки</span><input type="checkbox" id="set-sfx" ' + (set.sfx ? 'checked' : '') + '></label>' +
+          '<label class="row slider"><span>Громкость</span><input type="range" id="set-svol" min="0" max="100" value="' + Math.round(set.sfxVol * 100) + '"></label>' +
+
+          '<h4 class="sec">Вид</h4>' +
+          '<label class="row switch"><span>Тёмная тема</span><input type="checkbox" id="set-theme" ' + (set.theme === 'dark' ? 'checked' : '') + '></label>' +
+          '<label class="row switch"><span>Спокойный режим <em>(без пыли и тряски)</em></span><input type="checkbox" id="set-calm" ' + (set.calmMode ? 'checked' : '') + '></label>' +
+
+          '<h4 class="sec">Добыча</h4>' +
+          '<div class="stat"><span>монет в минуту</span><b>' + HC.fmt1(r.coins) + '</b></div>' +
+          '<div class="stat"><span>руды в минуту</span><b>' + HC.fmt1(r.ore) + '</b></div>' +
+          '<div class="stat"><span>склад</span><b>' + money(cap.coins) + ' / ' + money(cap.ore) + '</b></div>' +
+          '<div class="stat"><span>копилка офлайна</span><b>' + HC.fmt1(HC.Economy.offlineHours(s)) + ' ч</b></div>' +
+
+          '<h4 class="sec">Пройдено</h4>' +
+          '<div class="stat"><span>заездов</span><b>' + st.runs + '</b></div>' +
+          '<div class="stat"><span>всего метров</span><b>' + money(st.totalDistance) + '</b></div>' +
+          '<div class="stat"><span>всего монет заработано</span><b>' + money(st.totalCoins) + '</b></div>' +
+
+          '<h4 class="sec">Сохранение</h4>' +
+          '<p class="muted">Игра сама пишется в память браузера каждые несколько секунд. ' +
+          (HC.isMemoryOnly() ? '<b>Сейчас автосохранение недоступно</b> — браузер запретил запись. Сохраняйся в файл.' :
+           'Чтобы не потерять прогресс при чистке браузера — выгружай файл или код.') + '</p>' +
+          '<div class="row wrap">' +
+          '<button class="btn" id="save-file">Сохранить в файл</button>' +
+          '<button class="btn" id="save-code">Скопировать код</button>' +
+          '<button class="btn" id="load-file">Загрузить файл</button>' +
+          '</div>' +
+          '<textarea id="code-box" placeholder="Сюда можно вставить код сейва с другого устройства и нажать «Применить»"></textarea>' +
+          '<div class="row wrap"><button class="btn" id="apply-code">Применить код</button>' +
+          '<button class="btn ghost" id="wipe">Начать заново</button></div>' +
+          '<input type="file" id="file-input" accept=".json,application/json" hidden>';
+
+        return {
+          title: 'Настройки', html: html,
+          bind: function (root) {
+            function onSet() { HC.Audio.applySettings(G.state.settings); HC.save(G.state, true); }
+            root.querySelector('#set-music').addEventListener('change', function (e) {
+              G.state.settings.music = e.target.checked; onSet(); UI.syncSound();
+              if (e.target.checked) HC.Audio.unlock();
+            });
+            root.querySelector('#set-sfx').addEventListener('change', function (e) {
+              G.state.settings.sfx = e.target.checked; onSet();
+            });
+            root.querySelector('#set-mvol').addEventListener('input', function (e) {
+              G.state.settings.musicVol = e.target.value / 100; HC.Audio.applySettings(G.state.settings);
+            });
+            root.querySelector('#set-svol').addEventListener('input', function (e) {
+              G.state.settings.sfxVol = e.target.value / 100; HC.Audio.applySettings(G.state.settings);
+            });
+            root.querySelector('#set-theme').addEventListener('change', function (e) {
+              G.state.settings.theme = e.target.checked ? 'dark' : 'paper';
+              G.applyTheme(); HC.save(G.state, true);
+            });
+            root.querySelector('#set-calm').addEventListener('change', function (e) {
+              G.state.settings.calmMode = e.target.checked; HC.save(G.state, true);
+            });
+
+            root.querySelector('#save-file').addEventListener('click', function () {
+              var name = HC.exportFile(G.state);
+              UI.toast('Скачан файл ' + name);
+            });
+            root.querySelector('#save-code').addEventListener('click', function () {
+              var code = HC.exportCode(G.state);
+              var box = root.querySelector('#code-box');
+              box.value = code;
+              box.select();
+              var done = function () { UI.toast('Код сейва скопирован'); };
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(done, function () {
+                  UI.toast('Код в поле ниже — скопируй вручную');
+                });
+              } else {
+                try { document.execCommand('copy'); done(); }
+                catch (e) { UI.toast('Код в поле ниже — скопируй вручную'); }
+              }
+            });
+            var fi = root.querySelector('#file-input');
+            root.querySelector('#load-file').addEventListener('click', function () { fi.click(); });
+            fi.addEventListener('change', function () {
+              if (!fi.files[0]) return;
+              HC.importFile(fi.files[0]).then(function (st) {
+                G.replaceState(st);
+                UI.toast('Сейв загружен');
+                UI.refresh();
+              }, function (err) { UI.toast(err.message); });
+            });
+            root.querySelector('#apply-code').addEventListener('click', function () {
+              var v = root.querySelector('#code-box').value.trim();
+              if (!v) { UI.toast('Вставь код в поле'); return; }
+              try {
+                G.replaceState(HC.importCode(v));
+                UI.toast('Сейв загружен');
+                UI.refresh();
+              } catch (e) { UI.toast(e.message); }
+            });
+            root.querySelector('#wipe').addEventListener('click', function () {
+              if (!window.confirm('Стереть весь прогресс и начать заново? Это не отменить.')) return;
+              HC.wipe();
+              window.location.reload();
+            });
+          }
+        };
+      });
+    }
+  };
+
+  HC.UI = UI;
+})(window.HC);
