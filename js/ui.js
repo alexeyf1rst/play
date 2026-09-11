@@ -85,8 +85,13 @@ window.HC = window.HC || {};
     },
 
     syncSound: function () {
-      $('btn-sound').textContent = G.state.settings.music ? '♪' : '♪̸';
-      $('btn-sound').classList.toggle('off', !G.state.settings.music);
+      var on = G.state.settings.music;
+      ['btn-sound', 'btn-title-sound'].forEach(function (id) {
+        var b = $(id);
+        if (!b) return;
+        b.textContent = on ? '♪' : '♪̸';
+        b.classList.toggle('off', !on);
+      });
     },
 
     refreshTop: function () {

@@ -15,6 +15,8 @@
   --lift-2: 0 2px 4px rgba(28, 27, 25, .10), 0 8px 22px rgba(28, 27, 25, .12);
   --lift-in: inset 0 1px 0 rgba(255, 255, 255, .75);
   --radius: 14px;
+  /* заголовки той же гарнитурой, что и название игры */
+  --display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif;
 }
 body.theme-dark {
   --paper: #0f1012;
@@ -51,6 +53,54 @@ html, body {
   display: block;
   touch-action: none;
 }
+
+/* --- Экран запуска --------------------------------------- */
+#title {
+  position: fixed; inset: 0;
+  z-index: 12;
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: calc(38px + env(safe-area-inset-top)) 24px calc(30px + env(safe-area-inset-bottom));
+  text-align: center;
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--paper) 92%, transparent) 0%, color-mix(in srgb, var(--paper) 40%, transparent) 26%, transparent 42%),
+    linear-gradient(to top, color-mix(in srgb, var(--paper) 92%, transparent) 0%, color-mix(in srgb, var(--paper) 45%, transparent) 20%, transparent 38%);
+  animation: fade .5s ease;
+}
+#title h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(40px, 9vw, 68px);
+  letter-spacing: -.02em;
+  line-height: 1.05;
+}
+#title .tagline {
+  margin: 14px 0 0;
+  font-size: 12px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.title-bottom { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+#btn-play { min-width: 220px; font-size: 17px; padding: 17px 40px; }
+.title-stats {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.title-row { display: flex; gap: 10px; margin-top: 2px; }
+
+/* Мягкий переход между сценами */
+#fade {
+  position: fixed; inset: 0;
+  background: var(--paper);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .26s ease;
+  z-index: 30;
+}
+#fade.on { opacity: 1; pointer-events: all; }
 
 /* --- Верхняя панель ------------------------------------- */
 #top {
@@ -337,7 +387,7 @@ html, body {
   padding: 16px 18px 12px;
   border-bottom: 1px solid var(--line);
 }
-.sheet h2 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: -.01em; }
+.sheet h2 { margin: 0; font-family: var(--display); font-size: 22px; font-weight: 400; letter-spacing: -.01em; }
 #modal-close {
   border: 0; background: transparent; color: var(--ink-soft);
   font-size: 26px; line-height: 1; cursor: pointer; padding: 0 4px;
@@ -386,7 +436,7 @@ h4.sec:first-child { margin-top: 4px; }
 .stat b { font-variant-numeric: tabular-nums; font-weight: 650; }
 .stat.total { border-bottom: 0; border-top: 1px solid var(--ink); margin-top: 6px; padding-top: 12px; font-size: 16px; }
 
-.result { text-align: center; padding: 10px 0 16px; }
+.result { text-align: center; padding: 14px 0 18px; }
 .result .big { font-size: 46px; font-weight: 300; letter-spacing: -.03em; line-height: 1; }
 .result .big small { font-size: 18px; color: var(--ink-soft); }
 .result .muted { margin-top: 8px; }

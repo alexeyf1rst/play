@@ -144,7 +144,9 @@ window.HC = window.HC || {};
       grad.addColorStop(0, P.sky0); grad.addColorStop(1, P.sky1);
       g.fillStyle = grad;
       g.fillRect(0, 0, W, H);
+      HC.drawSun(g, W, H, P, this.pan, state.settings.theme === 'dark');
       HC.drawClouds(g, W, H, P, this.pan * this.scale, this.padY + 300 * this.scale, this.t);
+      HC.drawBirds(g, W, H, P, this.t, this.pan);
 
       g.save();
       g.translate(this.padX, this.padY);
@@ -152,6 +154,8 @@ window.HC = window.HC || {};
       g.translate(-this.pan, 0);
 
       this.drawValley(g, P);
+      this.drawDecor(g, P);
+      this.drawPath(g, P, state);
 
       // участки: сначала дальний ярус, потом ближний — чтобы дома не налезали
       var spots = this.places();
@@ -168,7 +172,11 @@ window.HC = window.HC || {};
       if (state.base.unlocked < spots.length) {
         this.drawLocked(g, spots[state.base.unlocked], P);
       }
+
+      this.drawParked(g, P, state);
       g.restore();
+
+      HC.drawVignette(g, W, H, P);
     },
 
     drawValley: function (g, P) {
@@ -248,6 +256,99 @@ window.HC = window.HC || {};
         if (x === x0) g.moveTo(x, fn(x)); else g.lineTo(x, fn(x));
       }
       g.stroke();
+      g.restore();
+    },
+
+    /* Деревья и камни по краям долины — чтобы это было место, а не полка */
+    drawDecor: function (g, P) {
+      var self = this;
+      // расставлено по промежуткам между участками, чтобы ничего не налезало
+      var items = [
+        { x: 230, row: 0, t: 'grass', s: 1.1 }, { x: 420, row: 0, t: 'bush', s: 1 },
+        { x: 610, row: 0, t: 'grass', s: 1 },   { x: 800, row: 0, t: 'rock', s: 0.85 },
+        { x: 990, row: 0, t: 'grass', s: 1.15 },{ x: 1155, row: 0, t: 'tree', s: 1.05 },
+        { x: 70,  row: 1, t: 'pine', s: 1.1 },  { x: 275, row: 1, t: 'rock', s: 0.8 },
+        { x: 445, row: 1, t: 'grass', s: 1.1 }, { x: 615, row: 1, t: 'bush', s: 0.95 },
+        { x: 785, row: 1, t: 'grass', s: 1 },   { x: 950, row: 1, t: 'rock', s: 0.75 },
+        { x: 1140, row: 1, t: 'tree', s: 1 },   { x: 1235, row: 1, t: 'pine', s: 1.15 }
+      ];
+      items.forEach(function (d) {
+        var y = d.row ? upperY(d.x) : lowerY(d.x);
+        g.save();
+        g.translate(d.x, y);
+        HC.Decor.shadow(g, P, 14 * d.s, 0.2);
+        HC.Decor.draw(g, d.t, P, d.s, d.x % 2 === 0);
+        g.restore();
+      });
+      self.drawSign(g, P);
+    },
+
+    /* Указатель на въезде */
+    drawSign: function (g, P) {
+      var x = 42, y = lowerY(x);
+      g.save();
+      g.translate(x, y);
+      HC.Decor.shadow(g, P, 14, 0.2);
+      g.strokeStyle = P.ink; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -52); g.stroke();
+      var sg = g.createLinearGradient(0, -62, 0, -34);
+      sg.addColorStop(0, P.bodyHi || P.bodyFill);
+      sg.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = sg; g.lineWidth = 2.2;
+      g.beginPath();
+      g.moveTo(-30, -62); g.lineTo(46, -62); g.lineTo(58, -48); g.lineTo(46, -34); g.lineTo(-30, -34);
+      g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = P.ink;
+      g.font = '600 13px ui-sans-serif, system-ui, sans-serif';
+      g.textAlign = 'center';
+      g.fillText('долина', 10, -43);
+      g.restore();
+    },
+
+    /* Тропинка вдоль нижнего яруса */
+    drawPath: function (g, P, state) {
+      g.save();
+      g.strokeStyle = P.groundTop || P.ground;
+      g.globalAlpha = 0.9;
+      g.lineWidth = 15;
+      g.lineCap = 'round';
+      g.beginPath();
+      for (var x = 40; x <= 1240; x += 16) g.lineTo(x, lowerY(x) + 17);
+      g.stroke();
+      g.strokeStyle = P.hatch;
+      g.globalAlpha = 0.25;
+      g.lineWidth = 1;
+      g.setLineDash([5, 12]);
+      g.beginPath();
+      for (var x2 = 40; x2 <= 1240; x2 += 16) g.lineTo(x2, lowerY(x2) + 17);
+      g.stroke();
+      g.setLineDash([]);
+      g.restore();
+      g.globalAlpha = 1;
+    },
+
+    /* Твоя машина стоит у въезда — видно, на чём поедешь */
+    drawParked: function (g, P, state) {
+      var def = HC.VEHICLES[state.vehicle];
+      if (!def) return;
+      var x = 1243, y = lowerY(x) + 4;
+      g.save();
+      g.translate(x, y);
+      g.scale(0.82, 0.82);
+      g.globalAlpha = 0.55;
+      g.fillStyle = P.shadow || 'rgba(0,0,0,.2)';
+      g.save(); g.scale(1, 0.15);
+      g.beginPath(); g.arc(6, 0, 58, 0, 6.3); g.fill();
+      g.restore();
+      g.globalAlpha = 1;
+      var rest = def.susp.rest;
+      var fake = {
+        def: def, ang: 0, pos: { x: 0, y: -rest - def.wheel.r - def.axles[0].y },
+        wheels: def.axles.map(function (a) {
+          return { pos: { x: a.x, y: -(def.wheel.r) + (a.r ? def.wheel.r - a.r : 0) }, r: a.r || def.wheel.r, spinAngle: 0.3 };
+        })
+      };
+      HC.Vehicle.prototype.draw.call(fake, g, P);
       g.restore();
     },
 

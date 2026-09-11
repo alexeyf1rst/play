@@ -12,13 +12,13 @@ window.HC = window.HC || {};
   var Ride = {
     active: false,
 
-    start: function (game, trackId) {
+    start: function (game, trackId, demo) {
       var st = game.state;
       var track = HC.TRACKS[trackId];
       this.game = game;
       this.trackId = trackId;
       this.track = track;
-      this.terrain = new HC.Terrain(track, (Math.random() * 1e9) | 0);
+      this.terrain = new HC.Terrain(track, (Math.random() * 1e9) | 0, trackId);
       this.car = new HC.Vehicle(st.vehicle, st.up[st.vehicle], this.terrain, track.gravity, st.tune[st.vehicle]);
       this.cam = { x: this.car.pos.x, y: this.car.pos.y, z: 1 };
       this.coins = 0;
@@ -35,6 +35,7 @@ window.HC = window.HC || {};
       this.floats = [];
       this.active = true;
       this.paused = false;
+      this.demo = !!demo;
       this.input = { throttle: 0 };
       this.rideMul = 1 + HC.Economy.workshopRide(st);
     },
@@ -48,6 +49,10 @@ window.HC = window.HC || {};
       this.time += dt;
       var car = this.car, T = this.terrain;
 
+      if (this.demo) {
+        input = { throttle: this.autoThrottle() };
+        car.fuel = car.maxFuel;
+      }
       var thr = this.phase === 'run' ? input.throttle : 0;
       car.update(dt, { throttle: thr });
 
@@ -68,6 +73,16 @@ window.HC = window.HC || {};
       this.dust(dt);
       this.updateFx(dt);
 
+      // в демо просто начинаем заново, ничего не считая
+      if (this.demo) {
+        if (car.crashed) {
+          this.demoWait = (this.demoWait || 0) + dt;
+          if (this.demoWait > 1.6) { this.demoWait = 0; this.start(this.game, this.trackId, true); }
+        }
+        this.camFollow(dt);
+        return;
+      }
+
       // чем кончился заезд
       if (this.phase === 'run') {
         if (car.crashed) this.beginEnd('Приехали');
@@ -78,12 +93,27 @@ window.HC = window.HC || {};
         if (this.endTimer > (car.crashed ? 1.3 : 2.2) && (slow || this.endTimer > 7)) this.finish();
       }
 
-      // камера
+      this.camFollow(dt);
+    },
+
+    camFollow: function (dt) {
+      var car = this.car;
       var lead = clamp(car.vel.x * 0.22, -160, 260);
       var k = 1 - Math.pow(0.0025, dt);
       this.cam.x = lerp(this.cam.x, car.pos.x + lead, k);
       var drop = (this.viewH || 600) * 0.10 / this.cam.z;   // машина чуть ниже центра экрана
       this.cam.y = lerp(this.cam.y, car.pos.y - drop, 1 - Math.pow(0.02, dt));
+    },
+
+    /* Водитель для заставки: в полёте выравнивается, на спуске придерживает */
+    autoThrottle: function () {
+      var car = this.car, T = this.terrain;
+      if (car.crashed) return 0;
+      if (!car.onGround) {
+        var err = -0.12 - car.ang - car.angVel * 0.35;
+        return Math.abs(err) < 0.05 ? 0 : (err < 0 ? 1 : -1);
+      }
+      return T.slope(car.pos.x + 70) < -0.28 ? 0.5 : 0.92;
     },
 
     beginEnd: function (reason) {
@@ -104,10 +134,11 @@ window.HC = window.HC || {};
       var base = Math.floor(this.coins * this.track.payout);
       var prev = st.stats.best[this.trackId] || 0;
       var record = dist > prev;
+      // запись о рекорде должна существовать всегда, иначе в итогах
+      // окажется «лучший результат undefined м»
+      st.stats.best[this.trackId] = Math.max(prev, dist);
       var bonus = record ? Math.floor((base + distCoins) * HC.ECON.recordBonus) : 0;
       var total = Math.floor((base + distCoins + bonus) * this.rideMul);
-
-      if (record) st.stats.best[this.trackId] = dist;
 
       var Q = HC.Quests;
       Q.report(st, 'dist_run', dist);
@@ -233,8 +264,11 @@ window.HC = window.HC || {};
       cam.z = clamp(Math.min(W / 700, H / 760), 0.50, 1.35);
 
       T.drawSky(g, W, H, P);
+      HC.drawSun(g, W, H, P, cam.x, this.game.state.settings.theme === 'dark');
       HC.drawClouds(g, W, H, P, cam.x * 0.12, H * 0.62, this.time * 0.6);
+      HC.drawBirds(g, W, H, P, this.time, cam.x);
       T.drawParallax(g, cam, W, H, P);
+      this.drawFarDecor(g, cam, W, H, P);
       T.drawGround(g, cam, W, H, P, this.game.quality);
       this.drawMarkers(g, W, H, P);
 
@@ -242,6 +276,9 @@ window.HC = window.HC || {};
       g.translate(W / 2, H / 2);
       g.scale(cam.z, cam.z);
       g.translate(-cam.x, -cam.y);
+
+      // декорации стоят на земле вместе с машиной
+      this.drawDecor(g, cam, W, H, P);
 
       // предметы
       var items = T.itemsIn(cam.x - W / cam.z, cam.x + W / cam.z);
@@ -269,6 +306,81 @@ window.HC = window.HC || {};
       }
       g.globalAlpha = 1;
       g.restore();
+
+      // передний план уезжает быстрее машины — отсюда ощущение скорости
+      this.drawForeground(g, cam, W, H, P);
+      HC.drawVignette(g, W, H, P);
+    },
+
+    /* Силуэты деревьев на дальней гряде */
+    drawFarDecor: function (g, cam, W, H, P) {
+      var T = this.terrain;
+      var k = 0.34, base = H * 0.72;
+      var x0 = cam.x * k, x1 = x0 + W;
+      var list = T.farDecorIn(x0 - 200, x1 + 200, 71);
+      g.save();
+      g.globalAlpha = 0.5;
+      for (var i = 0; i < list.length; i++) {
+        var d = list[i];
+        var sx = d.x - x0;
+        var y = base + HC.noise(d.x * 0.0026, T.seed + 77) * 80
+                     + HC.noise(d.x * 0.008, T.seed + 82) * 24;
+        g.save();
+        g.translate(sx, y + 2);
+        HC.Decor.draw(g, d.type, { ink: P.far1, bodyFill: P.far1, bodyHi: P.far1, bodyShade: P.far1 }, d.s, false);
+        g.restore();
+      }
+      g.restore();
+      g.globalAlpha = 1;
+    },
+
+    /* Деревья, столбы и камни вдоль дороги */
+    drawDecor: function (g, cam, W, H, P) {
+      var T = this.terrain;
+      var list = T.decorIn(cam.x - W / cam.z * 0.7, cam.x + W / cam.z * 0.7);
+      for (var i = 0; i < list.length; i++) {
+        var d = list[i];
+        var y = T.height(d.x);
+        g.save();
+        g.translate(d.x, y);
+        HC.Decor.shadow(g, P, 16 * d.s, 0.22);
+        HC.Decor.draw(g, d.type, P, d.s, d.flip);
+        g.restore();
+      }
+    },
+
+    /* Кусты у нижнего края экрана, идут быстрее — глубина кадра */
+    drawForeground: function (g, cam, W, H, P) {
+      if (this.game.state.settings.calmMode) return;
+      var k = 1.55;
+      var span = 260;
+      var x0 = cam.x * k;
+      var from = Math.floor((x0 - 200) / span);
+      var to = Math.floor((x0 + W + 200) / span);
+      g.save();
+      g.fillStyle = P.fore || P.groundDeep || P.ground;
+      g.globalAlpha = 0.9;
+      for (var i = from; i <= to; i++) {
+        var h = HC.hash(i, this.terrain.seed + 91);
+        if (h > 0.55) continue;
+        var sx = i * span + h * span - x0;
+        var s = 1.5 + h * 1.4;
+        var y = H + 4 - h * 46;
+        g.save();
+        g.translate(sx, y);
+        g.scale(s, s);
+        // куст-силуэт
+        g.beginPath();
+        g.arc(-11, -7, 11, Math.PI, 0);
+        g.arc(2, -14, 14, Math.PI, 0);
+        g.arc(15, -6, 10, Math.PI, 0);
+        g.lineTo(-22, 0);
+        g.closePath();
+        g.fill();
+        g.restore();
+      }
+      g.restore();
+      g.globalAlpha = 1;
     },
 
     drawMarkers: function (g, W, H, P) {

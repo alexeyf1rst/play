@@ -16,7 +16,7 @@ window.HC = window.HC || {};
       groundTop: '#e7e3db', groundDeep: '#b9b4a8',
       bodyHi: '#ffffff', bodyShade: '#ddd9d2',
       tyreHi: '#4a4843', rimShade: '#cfccc5',
-      shadow: 'rgba(28,27,25,0.20)'
+      shadow: 'rgba(28,27,25,0.20)', vignette: 'rgba(60,55,45,0.12)', fore: '#9c968a'
     },
     dark: {
       sky0: '#0f1012', sky1: '#191a1d',
@@ -27,7 +27,7 @@ window.HC = window.HC || {};
       groundTop: '#2b2c32', groundDeep: '#0e0f11',
       bodyHi: '#41434a', bodyShade: '#212228',
       tyreHi: '#26272b', rimShade: '#303238',
-      shadow: 'rgba(0,0,0,0.45)'
+      shadow: 'rgba(0,0,0,0.45)', vignette: 'rgba(0,0,0,0.34)', fore: '#08090a'
     }
   };
 
@@ -56,7 +56,7 @@ window.HC = window.HC || {};
       HC.UI.refreshTop();
       HC.UI.refreshPending();
 
-      this.goBase();
+      this.goTitle();
       this.last = performance.now();
       this.accum = 0;
       requestAnimationFrame(this.frame.bind(this));
@@ -75,11 +75,7 @@ window.HC = window.HC || {};
         else HC.Audio.resume();
       });
 
-      if (this.state.stats.runs === 0 && !this.state.base.plots.some(Boolean)) {
-        this.showWelcome();
-      } else if (Math.floor(this.state.base.pending.coins) >= 1 && off.seconds > 120) {
-        HC.UI.showOffline(off);
-      }
+      this.pendingOffline = (Math.floor(this.state.base.pending.coins) >= 1 && off.seconds > 120) ? off : null;
     },
 
     /* --- Тема и размеры ----------------------------------- */
@@ -137,6 +133,18 @@ window.HC = window.HC || {};
       });
 
       document.getElementById('btn-pause').addEventListener('click', function () { self.togglePause(); });
+      document.getElementById('btn-play').addEventListener('click', function () { self.startFromTitle(); });
+      document.getElementById('btn-title-settings').addEventListener('click', function () {
+        HC.Audio.unlock(); HC.UI.openSettings();
+      });
+      document.getElementById('btn-title-sound').addEventListener('click', function () {
+        var s = self.state.settings;
+        s.music = !s.music;
+        HC.Audio.unlock();
+        HC.Audio.applySettings(s);
+        HC.UI.syncSound();
+        HC.save(self.state, true);
+      });
 
       // база: перетаскивание и нажатие по участку
       var c = this.canvas;
@@ -173,6 +181,55 @@ window.HC = window.HC || {};
     },
 
     /* --- Сцены -------------------------------------------- */
+
+    /* Заставка: сверху название, на фоне по-настоящему едет машина */
+    goTitle: function () {
+      this.scene = 'title';
+      document.getElementById('title').hidden = false;
+      document.getElementById('ride-hud').hidden = true;
+      document.getElementById('base-bar').hidden = true;
+      document.getElementById('top').hidden = true;
+      document.getElementById('pending').hidden = true;
+
+      var open = Object.keys(HC.TRACKS).filter(function (t) { return true; });
+      var pick = open[(Math.random() * open.length) | 0];
+      HC.Ride.start(this, pick, true);
+
+      var st = this.state.stats;
+      var best = 0;
+      for (var k in st.best) best = Math.max(best, st.best[k]);
+      var line = document.getElementById('title-stats');
+      if (st.runs > 0) {
+        line.hidden = false;
+        line.textContent = 'рекорд ' + HC.fmt(best) + ' м · заездов ' + st.runs +
+          (this.state.coins ? ' · ' + HC.fmt(this.state.coins) + ' монет' : '');
+      } else {
+        line.hidden = true;
+      }
+    },
+
+    /* Плавный переход между сценами */
+    fadeTo: function (fn) {
+      var f = document.getElementById('fade');
+      f.classList.add('on');
+      setTimeout(function () {
+        fn();
+        setTimeout(function () { f.classList.remove('on'); }, 30);
+      }, 250);
+    },
+
+    startFromTitle: function () {
+      var self = this;
+      HC.Audio.unlock();
+      this.fadeTo(function () {
+        document.getElementById('title').hidden = true;
+        HC.Ride.stop();
+        self.goBase();
+        if (self.state.stats.runs === 0 && !self.state.base.plots.some(Boolean)) self.showWelcome();
+        else if (self.pendingOffline) { HC.UI.showOffline(self.pendingOffline); self.pendingOffline = null; }
+      });
+    },
+
     goBase: function () {
       this.scene = 'base';
       HC.Ride.stop();
@@ -185,6 +242,15 @@ window.HC = window.HC || {};
 
     startRide: function (trackId) {
       if (!this.state.tracks[trackId]) return;
+      var self = this;
+      if (this.scene === 'base') {
+        this.fadeTo(function () { self.beginRide(trackId); });
+        return;
+      }
+      this.beginRide(trackId);
+    },
+
+    beginRide: function (trackId) {
       this.lastTrack = trackId;
       this.state.track = trackId;
       this.scene = 'ride';
@@ -288,10 +354,10 @@ window.HC = window.HC || {};
       var g = this.g;
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-      if (this.scene === 'ride') {
+      if (this.scene === 'title' || this.scene === 'ride') {
         HC.Ride.update(dt, this.readInput());
         if (HC.Ride.active || HC.Ride.phase === 'ending') HC.Ride.draw(g, this.W, this.H, this.P);
-        this.updateRideHud();
+        if (this.scene === 'ride') this.updateRideHud();
       } else {
         HC.Base.update(dt);
         HC.Base.draw(g, this.W, this.H, this.P, this.state);

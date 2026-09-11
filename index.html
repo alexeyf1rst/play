@@ -19,6 +19,24 @@
 
 <canvas id="scene"></canvas>
 
+<!-- Экран запуска. За ним по-настоящему едет машина. -->
+<div id="title">
+  <div class="title-top">
+    <h1>Тихие холмы</h1>
+    <p class="tagline">холмы · монеты · шахты в долине</p>
+  </div>
+  <div class="title-bottom">
+    <button id="btn-play" class="btn main go">Играть</button>
+    <p id="title-stats" class="title-stats" hidden></p>
+    <div class="title-row">
+      <button id="btn-title-sound" class="icon-btn" title="Музыка" aria-label="Музыка">&#9834;</button>
+      <button id="btn-title-settings" class="icon-btn" title="Настройки" aria-label="Настройки">&#9776;</button>
+    </div>
+  </div>
+</div>
+
+<div id="fade"></div>
+
 <header id="top">
   <div class="res"><i class="ic coin"></i><b id="coins">0</b></div>
   <div class="res"><i class="ic ore"></i><b id="ore">0</b></div>
@@ -76,6 +94,7 @@
 <script src="js/storage.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/quests.js"></script>
+<script src="js/decor.js"></script>
 <script src="js/terrain.js"></script>
 <script src="js/vehicle.js"></script>
 <script src="js/ride.js"></script>

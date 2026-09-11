@@ -23,8 +23,9 @@ window.HC = window.HC || {};
   }
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
-  function Terrain(track, seed) {
+  function Terrain(track, seed, trackId) {
     this.track = track;
+    this.trackId = trackId || 'hills';
     this.seed = seed | 0;
     this.base = 0;
     this.base = this.raw(120);
@@ -118,6 +119,56 @@ window.HC = window.HC || {};
   };
 
   Terrain.prototype.take = function (item) { this.taken[item.id] = 1; };
+
+  /* --- Декорации ------------------------------------------
+     Расставлены из семечка: пейзаж у трассы всегда свой,
+     но от заезда к заезду не прыгает.
+  */
+  var DEC = 105;    // шаг раскладки
+
+  Terrain.prototype.decorCell = function (k) {
+    this.dec = this.dec || {};
+    if (this.dec[k]) return this.dec[k];
+    var set = HC.DECOR_SETS[this.trackId] || HC.DECOR_SETS.hills;
+    var out = [];
+    var r = hash(k, this.seed + 41);
+    if (r < 0.62) {
+      var pick = set[Math.floor(hash(k, this.seed + 42) * set.length)];
+      var x = k * DEC + hash(k, this.seed + 43) * DEC * 0.8;
+      out.push({
+        type: pick, x: x,
+        s: 0.75 + hash(k, this.seed + 44) * 0.5,
+        flip: hash(k, this.seed + 45) < 0.5
+      });
+    }
+    this.dec[k] = out;
+    return out;
+  };
+
+  Terrain.prototype.decorIn = function (x0, x1) {
+    var out = [];
+    for (var k = Math.floor(x0 / DEC); k <= Math.floor(x1 / DEC); k++) {
+      var c = this.decorCell(k);
+      for (var i = 0; i < c.length; i++) out.push(c[i]);
+    }
+    return out;
+  };
+
+  /* Мелочь на дальних холмах — только силуэты, для глубины. */
+  Terrain.prototype.farDecorIn = function (x0, x1, seedOff) {
+    var out = [];
+    var step = 150;
+    for (var k = Math.floor(x0 / step); k <= Math.floor(x1 / step); k++) {
+      if (hash(k, this.seed + seedOff) < 0.5) {
+        out.push({
+          x: k * step + hash(k, this.seed + seedOff + 1) * step * 0.7,
+          s: 0.4 + hash(k, this.seed + seedOff + 2) * 0.25,
+          type: hash(k, this.seed + seedOff + 3) < 0.5 ? 'pine' : 'tree'
+        });
+      }
+    }
+    return out;
+  };
 
   /* --- Отрисовка ------------------------------------------ */
   Terrain.prototype.drawSky = function (g, W, H, P) {
@@ -244,6 +295,60 @@ window.HC = window.HC || {};
       cloud(g, x, y, 0.75 + ((i * 5) % 7) / 7 * 0.85);
     }
     g.restore();
+  };
+
+  /* Солнце днём, луна в тёмной теме. Висит почти неподвижно. */
+  HC.drawSun = function (g, W, H, P, offset, dark) {
+    var x = W * 0.78 - offset * 0.015;
+    var y = H * 0.17;
+    g.save();
+    g.globalAlpha = 0.5;
+    g.fillStyle = P.far0;
+    g.beginPath(); g.arc(x, y, 62, 0, 6.3); g.fill();
+    g.globalAlpha = 0.85;
+    g.fillStyle = P.groundTop || P.far1;
+    g.beginPath(); g.arc(x, y, 34, 0, 6.3); g.fill();
+    if (dark) {
+      g.fillStyle = P.far1;
+      g.globalAlpha = 0.7;
+      g.beginPath(); g.arc(x - 11, y - 8, 7, 0, 6.3); g.fill();
+      g.beginPath(); g.arc(x + 9, y + 6, 5, 0, 6.3); g.fill();
+      g.beginPath(); g.arc(x + 3, y - 13, 3.5, 0, 6.3); g.fill();
+    }
+    g.restore();
+    g.globalAlpha = 1;
+  };
+
+  /* Пара птиц. Медленно, без суеты. */
+  HC.drawBirds = function (g, W, H, P, time, offset) {
+    g.save();
+    g.strokeStyle = P.ink;
+    g.globalAlpha = 0.28;
+    g.lineWidth = 1.8;
+    g.lineCap = 'round';
+    for (var i = 0; i < 3; i++) {
+      var span = W + 420;
+      var x = (((i * 260 + time * (11 + i * 4) - offset * 0.05) % span) + span) % span - 210;
+      var y = H * (0.13 + i * 0.05) + Math.sin(time * 0.6 + i) * 7;
+      var s = 1 - i * 0.2;
+      var flap = Math.sin(time * 2.6 + i * 1.7) * 3;
+      g.beginPath();
+      g.moveTo(x - 8 * s, y + flap * s);
+      g.quadraticCurveTo(x, y - 5 * s, x + 8 * s, y + flap * s);
+      g.stroke();
+    }
+    g.restore();
+    g.globalAlpha = 1;
+  };
+
+  /* Лёгкое затемнение по краям — кадр собирается к центру. */
+  HC.drawVignette = function (g, W, H, P) {
+    var r = Math.max(W, H) * 0.75;
+    var vg = g.createRadialGradient(W / 2, H * 0.45, r * 0.45, W / 2, H * 0.45, r);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, P.vignette || 'rgba(0,0,0,0.10)');
+    g.fillStyle = vg;
+    g.fillRect(0, 0, W, H);
   };
 
   HC.Terrain = Terrain;
