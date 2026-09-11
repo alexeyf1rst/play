@@ -136,7 +136,10 @@ window.HC = window.HC || {};
     ];
     for (var l = 0; l < layers.length; l++) {
       var L = layers[l];
-      g.fillStyle = L.col;
+      var lg = g.createLinearGradient(0, L.y - L.amp, 0, H);
+      lg.addColorStop(0, L.col);
+      lg.addColorStop(1, l === 0 ? (P.far1 || L.col) : (P.ground || L.col));
+      g.fillStyle = lg;
       g.beginPath();
       g.moveTo(0, H);
       for (var sx = 0; sx <= W; sx += 12) {
@@ -151,51 +154,69 @@ window.HC = window.HC || {};
     }
   };
 
-  /* Земля: сплошная заливка + штриховка "от руки". */
+  /* Земля: градиент вглубь, освещённая кромка и штриховка "от руки". */
   Terrain.prototype.drawGround = function (g, cam, W, H, P, quality) {
     var step = 6;
     var pts = [];
+    var top = H;
     for (var sx = -step; sx <= W + step; sx += step) {
       var wx = cam.x + (sx - W / 2) / cam.z;
-      pts.push({ sx: sx, sy: (this.height(wx) - cam.y) * cam.z + H / 2 });
+      var sy = (this.height(wx) - cam.y) * cam.z + H / 2;
+      if (sy < top) top = sy;
+      pts.push({ sx: sx, sy: sy });
     }
 
-    g.fillStyle = P.ground;
-    g.beginPath();
-    g.moveTo(pts[0].sx, pts[0].sy);
-    for (var i = 1; i < pts.length; i++) g.lineTo(pts[i].sx, pts[i].sy);
+    function trace() {
+      g.beginPath();
+      g.moveTo(pts[0].sx, pts[0].sy);
+      for (var i = 1; i < pts.length; i++) g.lineTo(pts[i].sx, pts[i].sy);
+    }
+
+    // тело земли — светлее у поверхности, темнее вглубь: появляется толщина
+    var grad = g.createLinearGradient(0, top, 0, H + 40);
+    grad.addColorStop(0, P.ground);
+    grad.addColorStop(1, P.groundDeep || P.ground);
+    g.fillStyle = grad;
+    trace();
     g.lineTo(W + step, H + 40);
     g.lineTo(-step, H + 40);
     g.closePath();
     g.fill();
 
-    // штриховка под поверхностью
+    g.save();
+    g.clip();
+
+    // освещённая полоса прямо под кромкой
+    g.strokeStyle = P.groundTop || P.ground;
+    g.globalAlpha = 0.95;
+    g.lineWidth = 8;
+    g.lineJoin = 'round';
+    trace();
+    g.stroke();
+    g.globalAlpha = 1;
+
     if (quality !== 'low') {
-      g.save();
-      g.clip();
       g.strokeStyle = P.hatch;
       g.lineWidth = 1;
-      g.globalAlpha = 0.5;
+      g.globalAlpha = 0.45;
       g.beginPath();
       var start = Math.floor(cam.x / 26) * 26;
       for (var wx2 = start - 400; wx2 < cam.x + W / cam.z + 400; wx2 += 26) {
         var sx2 = (wx2 - cam.x) * cam.z + W / 2;
         var sy2 = (this.height(wx2) - cam.y) * cam.z + H / 2;
-        g.moveTo(sx2, sy2 + 4);
-        g.lineTo(sx2 - 16, sy2 + 46);
+        g.moveTo(sx2, sy2 + 12);
+        g.lineTo(sx2 - 16, sy2 + 54);
       }
       g.stroke();
-      g.restore();
       g.globalAlpha = 1;
     }
+    g.restore();
 
-    // линия поверхности
+    // сама кромка
     g.strokeStyle = P.ink;
     g.lineWidth = 2.5;
     g.lineJoin = 'round';
-    g.beginPath();
-    g.moveTo(pts[0].sx, pts[0].sy);
-    for (var j = 1; j < pts.length; j++) g.lineTo(pts[j].sx, pts[j].sy);
+    trace();
     g.stroke();
   };
 

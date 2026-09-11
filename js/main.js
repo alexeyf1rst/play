@@ -11,14 +11,23 @@ window.HC = window.HC || {};
       far0: '#d5d2ca', far1: '#c3bfb5',
       ground: '#ddd9d1', hatch: '#8e8b83', ink: '#1c1b19',
       bodyFill: '#faf9f6', tyre: '#2b2a27', rim: '#eceae5',
-      driver: '#faf9f6', coin: '#e8e5de', dust: '#9b978f'
+      driver: '#faf9f6', coin: '#e8e5de', dust: '#9b978f',
+      // тона для объёма
+      groundTop: '#e7e3db', groundDeep: '#b9b4a8',
+      bodyHi: '#ffffff', bodyShade: '#ddd9d2',
+      tyreHi: '#4a4843', rimShade: '#cfccc5',
+      shadow: 'rgba(28,27,25,0.20)'
     },
     dark: {
       sky0: '#0f1012', sky1: '#191a1d',
       far0: '#212226', far1: '#2a2b30',
       ground: '#1d1e21', hatch: '#3c3e43', ink: '#e9e8e4',
       bodyFill: '#2c2d32', tyre: '#0c0c0e', rim: '#3d3f45',
-      driver: '#e9e8e4', coin: '#3a3c42', dust: '#5a5c62'
+      driver: '#e9e8e4', coin: '#3a3c42', dust: '#5a5c62',
+      groundTop: '#2b2c32', groundDeep: '#0e0f11',
+      bodyHi: '#41434a', bodyShade: '#212228',
+      tyreHi: '#26272b', rimShade: '#303238',
+      shadow: 'rgba(0,0,0,0.45)'
     }
   };
 

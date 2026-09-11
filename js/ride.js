@@ -303,12 +303,19 @@ window.HC = window.HC || {};
       if (it.type === 'coin') {
         var bob = Math.sin(this.time * 2 + it.x * 0.01) * 3;
         g.translate(0, bob);
-        g.fillStyle = P.coin;
+        var cg = g.createRadialGradient(-4, -5, 1, 0, 0, 13);
+        cg.addColorStop(0, P.bodyHi || P.coin);
+        cg.addColorStop(1, P.coin);
+        g.fillStyle = cg;
         g.beginPath(); g.arc(0, 0, 11, 0, Math.PI * 2); g.fill(); g.stroke();
         g.lineWidth = 1.5;
         g.beginPath(); g.arc(0, 0, 6, 0, Math.PI * 2); g.stroke();
       } else if (it.type === 'fuel') {
-        g.fillStyle = P.bodyFill;
+        var fg = g.createLinearGradient(-11, 0, 11, 0);
+        fg.addColorStop(0, P.bodyHi || P.bodyFill);
+        fg.addColorStop(0.55, P.bodyFill);
+        fg.addColorStop(1, P.bodyShade || P.bodyFill);
+        g.fillStyle = fg;
         g.beginPath();
         g.rect(-11, -14, 22, 28);
         g.fill(); g.stroke();
@@ -320,7 +327,11 @@ window.HC = window.HC || {};
       } else if (it.type === 'ore') {
         var bob2 = Math.sin(this.time * 1.6 + it.x * 0.01) * 2;
         g.translate(0, bob2);
-        g.fillStyle = P.rim;
+        var og = g.createLinearGradient(-12, -14, 12, 12);
+        og.addColorStop(0, P.bodyHi || P.rim);
+        og.addColorStop(0.5, P.rim);
+        og.addColorStop(1, P.rimShade || P.rim);
+        g.fillStyle = og;
         g.beginPath();
         g.moveTo(0, -14); g.lineTo(12, -4); g.lineTo(8, 12); g.lineTo(-8, 12); g.lineTo(-12, -4);
         g.closePath(); g.fill(); g.stroke();

@@ -198,7 +198,10 @@ window.HC = window.HC || {};
     terrace: function (g, P, fn, x0, x1, rounded) {
       var x;
       g.save();
-      g.fillStyle = P.ground;
+      var tg = g.createLinearGradient(0, fn(x0) - 20, 0, VH + 200);
+      tg.addColorStop(0, P.ground);
+      tg.addColorStop(1, P.groundDeep || P.ground);
+      g.fillStyle = tg;
       g.beginPath();
       g.moveTo(x0, VH + 900);
       if (rounded) g.lineTo(x0 + 26, fn(x0 + 26) + 10);
@@ -208,20 +211,33 @@ window.HC = window.HC || {};
       g.closePath();
       g.fill();
 
-      // штриховка сразу под кромкой
       g.save();
       g.clip();
-      g.strokeStyle = P.hatch;
-      g.globalAlpha = 0.45;
-      g.lineWidth = 1;
+
+      // освещённая полоса под кромкой — уступ получает толщину
+      g.strokeStyle = P.groundTop || P.ground;
+      g.globalAlpha = 0.95;
+      g.lineWidth = 9;
+      g.lineJoin = 'round';
       g.beginPath();
-      for (x = x0; x < x1; x += 22) {
-        g.moveTo(x, fn(x) + 3);
-        g.lineTo(x - 14, fn(x) + 40);
+      for (x = x0; x <= x1; x += 14) {
+        if (x === x0) g.moveTo(x, fn(x)); else g.lineTo(x, fn(x));
       }
       g.stroke();
-      g.restore();
       g.globalAlpha = 1;
+
+      // штриховка
+      g.strokeStyle = P.hatch;
+      g.globalAlpha = 0.26;
+      g.lineWidth = 1;
+      g.beginPath();
+      for (x = x0; x < x1; x += 36) {
+        g.moveTo(x, fn(x) + 13);
+        g.lineTo(x - 13, fn(x) + 47);
+      }
+      g.stroke();
+      g.globalAlpha = 1;
+      g.restore();
 
       // кромка
       g.strokeStyle = P.ink;
@@ -292,7 +308,11 @@ window.HC = window.HC || {};
       g.translate(-(box.x0 + box.x1) / 2, -box.y1);
 
       g.strokeStyle = P.ink;
-      g.fillStyle = P.bodyFill;
+      var tgr = g.createLinearGradient(0, -90, 0, 10);
+      tgr.addColorStop(0, P.bodyHi || P.bodyFill);
+      tgr.addColorStop(0.55, P.bodyFill);
+      tgr.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = tgr;
       g.lineWidth = 2.4;
       g.lineJoin = 'round';
       var fn = this.shapes[type];
@@ -304,10 +324,26 @@ window.HC = window.HC || {};
 
     /* --- Постройки ---------------------------------------- */
     drawBuilding: function (g, type, level, s, P) {
+      // тень на земле — постройка перестаёт быть наклейкой
+      g.save();
+      g.globalAlpha = 0.5;
+      g.fillStyle = P.shadow || 'rgba(0,0,0,.2)';
+      g.translate(s.x + 10, s.y + 1);
+      g.scale(1, 0.16);
+      g.beginPath();
+      g.arc(0, 0, 46, 0, Math.PI * 2);
+      g.fill();
+      g.restore();
+      g.globalAlpha = 1;
+
       g.save();
       g.translate(s.x, s.y);
       g.strokeStyle = P.ink;
-      g.fillStyle = P.bodyFill;
+      var bg = g.createLinearGradient(0, -90, 0, 10);
+      bg.addColorStop(0, P.bodyHi || P.bodyFill);
+      bg.addColorStop(0.55, P.bodyFill);
+      bg.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = bg;
       g.lineWidth = 2.4;
       g.lineJoin = 'round';
       var fn = this.shapes[type];

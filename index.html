@@ -29,18 +29,33 @@
 
 <button id="pending" hidden></button>
 
+<!-- Низ экрана разложен по смыслу: слева то, во что вкладываешь,
+     по центру главное действие, справа цели. -->
 <nav id="base-bar">
-  <button id="btn-quests" class="btn">Задания<b id="quest-badge" hidden>0</b></button>
-  <button id="btn-garage" class="btn">Гараж</button>
-  <button id="btn-ride" class="btn main">Поехать</button>
-  <button id="btn-shop" class="btn">Магазин</button>
+  <div class="bar-zone left">
+    <button id="btn-garage" class="btn">Гараж</button>
+    <button id="btn-shop" class="btn">Магазин</button>
+  </div>
+  <button id="btn-ride" class="btn main go">Поехать</button>
+  <div class="bar-zone right">
+    <button id="btn-quests" class="btn">Задания<b id="quest-badge" hidden>0</b></button>
+  </div>
 </nav>
 
 <div id="ride-hud" hidden>
+  <!-- Слева расход, по центру главное число, справа заработок и пауза -->
   <div id="ride-top">
-    <div id="fuel-wrap"><i id="fuel-bar"></i></div>
-    <div id="ride-stats"><span id="dist">0 м</span><span class="dot">·</span><i class="ic coin"></i><span id="run-coins">0</span></div>
-    <button id="btn-pause" class="icon-btn" title="Пауза" aria-label="Пауза">&#10073;&#10073;</button>
+    <div class="hud-zone left">
+      <div id="fuel-wrap"><i id="fuel-bar"></i></div>
+      <span class="hud-cap">топливо</span>
+    </div>
+    <div class="hud-zone center">
+      <span id="dist">0 м</span>
+    </div>
+    <div class="hud-zone right">
+      <span class="run-coins"><i class="ic coin"></i><span id="run-coins">0</span></span>
+      <button id="btn-pause" class="icon-btn" title="Пауза" aria-label="Пауза">&#10073;&#10073;</button>
+    </div>
   </div>
   <div id="pedals">
     <button id="pedal-brake" class="pedal" aria-label="Тормоз">&#9664;</button>

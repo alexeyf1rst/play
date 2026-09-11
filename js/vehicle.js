@@ -38,7 +38,10 @@ window.HC = window.HC || {};
     // низкое давление — цепче, но хуже катится
     this.grip = def.wheel.grip * E.tires(lu.tires) * (1.30 - 0.30 * press);
     this.rollFree = 0.5 * (1.70 - 0.70 * press);
-    this.airK = HC.WORLD.airControl * airk;
+    // отзывчивость в воздухе: общая настройка × характер машины × ползунок тюнинга
+    var airBase = def.airCtrl || 1;
+    this.airK = HC.WORLD.airControl * airBase * airk;
+    this.airMax = Math.max(3.0, Math.min(7.5, 4.2 * airBase * Math.sqrt(airk)));
     this.maxFuel = def.fuel * E.fuel(lu.fuel);
     this.magnet = E.magnet(lu.magnet);
 
@@ -112,6 +115,7 @@ window.HC = window.HC || {};
     this.crashed = false;
     this.stopped = false;
     this.airTime = 0;
+    this.airT = 0;
     this.spinAccum = 0;
     this.distance = 0;
     this.startX = x;
@@ -275,17 +279,27 @@ window.HC = window.HC || {};
     var head = this.worldPoint(this.def.head[0], this.def.head[1]);
     if (head.y > T.height(head.x) - 2) this.crashed = true;
 
-    /* 6. Управление в полёте */
+    /* 6. Управление в полёте.
+       Включается не мгновенно, а за десятую долю секунды: иначе короткий
+       отрыв колёс на кочке успевал бы развернуть машину на спину. */
     this.onGround = anyContact;
-    if (!anyContact && throttle !== 0) {
-      this.angVel -= throttle * this.airK * h;
-      this.angVel = clamp(this.angVel, -4.0, 4.0);
+    if (anyContact) {
+      this.airT = 0;
+    } else {
+      this.airT = (this.airT || 0) + h;
+      if (throttle !== 0) {
+        var ramp = Math.min(1, this.airT / 0.16);
+        this.angVel -= throttle * this.airK * ramp * h;
+        this.angVel = clamp(this.angVel, -this.airMax, this.airMax);
+      }
     }
 
     /* 7. Сопротивление и качение */
     var drag = 1 - 0.10 * h;
     this.vel.x *= drag; this.vel.y *= drag;
-    this.angVel *= 1 - 0.9 * h;
+    // в воздухе вращение почти не гасится — иначе машина не слушается руля.
+    // На земле гасим сильнее, чтобы не козлила.
+    this.angVel *= 1 - (anyContact ? 1.25 : 0.22) * h;
     for (i = 0; i < this.wheels.length; i++) {
       this.wheels[i].spin *= 1 - (throttle === 0 ? this.rollFree : 0.06) * h;
     }
@@ -349,12 +363,32 @@ window.HC = window.HC || {};
   Vehicle.prototype.draw = function (g, P) {
     var self = this;
 
+    // тень на земле: чем выше машина, тем бледнее и шире
+    if (this.terrain) {
+      var gy = this.terrain.height(this.pos.x);
+      var up = Math.max(0, gy - this.pos.y);
+      var a = Math.max(0.05, Math.min(0.42, 0.42 - (up - 50) / 320));
+      g.save();
+      g.globalAlpha = a;
+      g.fillStyle = P.shadow || 'rgba(0,0,0,.2)';
+      g.translate(this.pos.x, gy - 3);
+      g.scale(1, 0.16);
+      g.beginPath();
+      g.arc(0, 0, 54 + up * 0.22, 0, Math.PI * 2);
+      g.fill();
+      g.restore();
+      g.globalAlpha = 1;
+    }
+
     // колёса
     this.wheels.forEach(function (w) {
       g.save();
       g.translate(w.pos.x, w.pos.y);
       g.rotate(w.spinAngle);
-      g.fillStyle = P.tyre;
+      var tg = g.createRadialGradient(-w.r * 0.4, -w.r * 0.45, w.r * 0.1, 0, 0, w.r * 1.15);
+      tg.addColorStop(0, P.tyreHi || P.tyre);
+      tg.addColorStop(1, P.tyre);
+      g.fillStyle = tg;
       g.strokeStyle = P.ink;
       g.lineWidth = 2.2;
       g.beginPath(); g.arc(0, 0, w.r, 0, Math.PI * 2); g.fill(); g.stroke();
@@ -368,7 +402,10 @@ window.HC = window.HC || {};
       }
       g.stroke();
       // диск
-      g.fillStyle = P.rim;
+      var rg = g.createLinearGradient(0, -w.r * 0.45, 0, w.r * 0.45);
+      rg.addColorStop(0, P.rim);
+      rg.addColorStop(1, P.rimShade || P.rim);
+      g.fillStyle = rg;
       g.beginPath(); g.arc(0, 0, w.r * 0.45, 0, Math.PI * 2); g.fill(); g.stroke();
       g.lineWidth = 1.8;
       g.beginPath();
@@ -398,8 +435,15 @@ window.HC = window.HC || {};
     });
     g.stroke();
 
-    // кузов
-    g.fillStyle = P.bodyFill;
+    // кузов: светлее сверху, темнее снизу — читается как объём
+    var bb0 = 1e9, bb1 = -1e9;
+    this.def.body.forEach(function (p) { bb0 = Math.min(bb0, p[1]); bb1 = Math.max(bb1, p[1]); });
+    var bg = g.createLinearGradient(0, bb0, 0, bb1);
+    bg.addColorStop(0, P.bodyHi || P.bodyFill);
+    bg.addColorStop(0.48, P.bodyFill);
+    bg.addColorStop(0.52, P.bodyShade || P.bodyFill);
+    bg.addColorStop(1, P.bodyShade || P.bodyFill);
+    g.fillStyle = bg;
     g.strokeStyle = P.ink;
     g.lineWidth = 2.6;
     g.lineJoin = 'round';
@@ -412,7 +456,10 @@ window.HC = window.HC || {};
 
     // водитель
     var hx = this.def.head[0], hy = this.def.head[1];
-    g.fillStyle = P.driver;
+    var hg = g.createLinearGradient(hx - 8, hy - 4, hx + 8, hy + 12);
+    hg.addColorStop(0, P.bodyHi || P.driver);
+    hg.addColorStop(1, P.bodyShade || P.driver);
+    g.fillStyle = hg;
     g.beginPath(); g.arc(hx, hy + 4, 8, 0, Math.PI * 2); g.fill(); g.stroke();
     g.lineWidth = 5;
     g.beginPath();
