@@ -7,6 +7,8 @@ window.HC = window.HC || {};
   'use strict';
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  var FLIP_NAMES = ['САЛЬТО', 'ДВОЙНОЕ САЛЬТО', 'ТРОЙНОЕ САЛЬТО', 'ЧЕТВЕРНОЕ!', 'НЕВЕРОЯТНО!'];
   function lerp(a, b, t) { return a + (b - a) * t; }
 
   var Ride = {
@@ -24,6 +26,7 @@ window.HC = window.HC || {};
       this.coins = 0;
       this.ore = 0;
       this.flips = 0;
+      this.airFlips = 0;
       this.cans = 0;
       this.airTotal = 0;
       this.airBonus = 0;
@@ -61,10 +64,25 @@ window.HC = window.HC || {};
         if (Math.abs(car.spinAccum) > Math.PI * 2) {
           car.spinAccum -= Math.sign(car.spinAccum) * Math.PI * 2;
           this.flips++;
-          this.addCoins(40, car.pos.x, car.pos.y - 60, 'сальто');
+          this.airFlips++;
+          // каждое следующее сальто в одном прыжке дороже предыдущего
+          var n = this.airFlips;
+          var gain = HC.ECON.flipCoins * n;
+          this.coins += gain;
+          this.floats.push({
+            x: car.pos.x, y: car.pos.y - 78, t: 0, big: true,
+            text: (FLIP_NAMES[Math.min(n, FLIP_NAMES.length) - 1]) + '  +' + gain
+          });
+          HC.Audio.flip(n);
         }
-      } else if (car.airTime === 0 && this._lastAir > 1.1 && !car.crashed) {
-        this.addCoins(Math.round(this._lastAir * 18), car.pos.x, car.pos.y - 60, 'полёт');
+      } else {
+        if (car.airTime === 0 && this._lastAir > HC.ECON.airMin && !car.crashed && this.airFlips === 0) {
+          var ab = Math.round(this._lastAir * HC.ECON.airBonus);
+          this.coins += ab;
+          this.floats.push({ x: car.pos.x, y: car.pos.y - 74, t: 0, big: true, text: 'ДОЛГИЙ ПРЫЖОК  +' + ab });
+          HC.Audio.chime();
+        }
+        this.airFlips = 0;
       }
       this._lastAir = car.airTime;
 
@@ -252,8 +270,8 @@ window.HC = window.HC || {};
       for (i = this.floats.length - 1; i >= 0; i--) {
         p = this.floats[i];
         p.t += dt;
-        p.y -= dt * 34;
-        if (p.t > 1.5) this.floats.splice(i, 1);
+        p.y -= dt * (p.big ? 22 : 34);
+        if (p.t > (p.big ? 1.7 : 1.5)) this.floats.splice(i, 1);
       }
     },
 
@@ -295,14 +313,29 @@ window.HC = window.HC || {};
 
       this.car.draw(g, P);
 
-      // всплывающие подписи
-      g.font = '600 15px ui-sans-serif, system-ui, sans-serif';
+      // всплывающие подписи; за трюки — крупно, с подложкой
       g.textAlign = 'center';
       for (i = 0; i < this.floats.length; i++) {
         var f = this.floats[i];
-        g.globalAlpha = clamp(1.5 - f.t, 0, 1) * 0.85;
-        g.fillStyle = P.ink;
-        g.fillText(f.text, f.x, f.y);
+        var a = clamp(1.6 - f.t, 0, 1);
+        if (f.big) {
+          g.font = '700 23px ui-sans-serif, system-ui, sans-serif';
+          var w = g.measureText(f.text).width;
+          g.globalAlpha = a * 0.9;
+          g.fillStyle = P.panelSolid || P.bodyFill;
+          g.beginPath();
+          if (g.roundRect) g.roundRect(f.x - w / 2 - 14, f.y - 22, w + 28, 32, 16);
+          else g.rect(f.x - w / 2 - 14, f.y - 22, w + 28, 32);
+          g.fill();
+          g.lineWidth = 2; g.strokeStyle = P.ink; g.stroke();
+          g.fillStyle = P.ink;
+          g.fillText(f.text, f.x, f.y);
+        } else {
+          g.font = '600 15px ui-sans-serif, system-ui, sans-serif';
+          g.globalAlpha = a * 0.85;
+          g.fillStyle = P.ink;
+          g.fillText(f.text, f.x, f.y);
+        }
       }
       g.globalAlpha = 1;
       g.restore();

@@ -9,7 +9,7 @@ window.HC = window.HC || {};
 (function (HC) {
   'use strict';
 
-  var REF_G = 1750;    // гравитация, под которую считаем пружины
+  var REF_G = 1400;    // гравитация, под которую считаем пружины
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
   function Vehicle(id, up, terrain, gravity, tune) {
@@ -41,7 +41,7 @@ window.HC = window.HC || {};
     // отзывчивость в воздухе: общая настройка × характер машины × ползунок тюнинга
     var airBase = def.airCtrl || 1;
     this.airK = HC.WORLD.airControl * airBase * airk;
-    this.airMax = Math.max(3.0, Math.min(7.5, 4.2 * airBase * Math.sqrt(airk)));
+    this.airMax = Math.max(3.6, Math.min(11.5, 5.6 * airBase * Math.sqrt(airk)));
     this.maxFuel = def.fuel * E.fuel(lu.fuel);
     this.magnet = E.magnet(lu.magnet);
 
@@ -275,9 +275,11 @@ window.HC = window.HC || {};
       if (pen2 > 8) this.pos.y -= (pen2 - 8) * 0.5;
     }
 
-    /* 5. Голова водителя */
+    /* 5. Голова водителя.
+       Небольшой запас: голова может чиркнуть землю на крутой посадке и
+       остаться цела. Без него любое сальто заканчивалось аварией. */
     var head = this.worldPoint(this.def.head[0], this.def.head[1]);
-    if (head.y > T.height(head.x) - 2) this.crashed = true;
+    if (head.y > T.height(head.x) + 9) this.crashed = true;
 
     /* 6. Управление в полёте.
        Включается не мгновенно, а за десятую долю секунды: иначе короткий
@@ -288,7 +290,7 @@ window.HC = window.HC || {};
     } else {
       this.airT = (this.airT || 0) + h;
       if (throttle !== 0) {
-        var ramp = Math.min(1, this.airT / 0.16);
+        var ramp = Math.min(1, this.airT / 0.28);
         this.angVel -= throttle * this.airK * ramp * h;
         this.angVel = clamp(this.angVel, -this.airMax, this.airMax);
       }

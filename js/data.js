@@ -14,7 +14,7 @@ window.HC = window.HC || {};
   HC.WORLD = {
     gravity: 1750,     // px/с^2
     substeps: 8,       // шагов физики на кадр (больше = стабильнее)
-    airControl: 7.0    // отзывчивость в воздухе (у каждой машины свой множитель airCtrl)
+    airControl: 20.0   // отзывчивость в воздухе (у каждой машины свой множитель airCtrl)
   };
 
   /* --- Машины -------------------------------------------
@@ -25,9 +25,9 @@ window.HC = window.HC || {};
   HC.VEHICLES = {
     jeep: {
       name: 'Джип', order: 0,
-      about: 'Спокойный универсал. Ничего лишнего.',
+      about: 'Спокойный универсал. Середина во всём — с него удобно начинать.',
       price: 0, priceOre: 0,
-      mass: 9, power: 15000, fuel: 100, burn: 2.5, topSpeed: 900, react: 1.00, airCtrl: 1.00,
+      mass: 9, power: 15000, fuel: 100, burn: 2.5, topSpeed: 950, react: 1.00, airCtrl: 1.00,
       drive: 'all',
       wheel: { r: 21, mass: 1.5, grip: 1.00 },
       susp:  { rest: 26, min: 9, max: 44, sag: 9, damp: 0.55 },
@@ -37,11 +37,11 @@ window.HC = window.HC || {};
     },
     bike: {
       name: 'Мотоцикл', order: 1,
-      about: 'Лёгкий и послушный. В воздухе крутится как хочешь — держи его сам.',
+      about: 'Ракета. Разгоняется вдвое резче джипа и крутит сальто там, где другие только подпрыгнут. Сцепления почти нет.',
       price: 3500, priceOre: 0,
-      mass: 5.2, power: 10600, fuel: 70, burn: 1.9, topSpeed: 1060, react: 0.95, airCtrl: 1.95,
+      mass: 5.2, power: 16000, fuel: 70, burn: 2.1, topSpeed: 1250, react: 0.95, airCtrl: 1.95,
       drive: 'rear',
-      wheel: { r: 24, mass: 1.1, grip: 0.92 },
+      wheel: { r: 24, mass: 1.1, grip: 0.82 },
       susp:  { rest: 30, min: 11, max: 54, sag: 10, damp: 0.58 },
       axles: [ { x: -32, y: 4 }, { x: 32, y: 4 } ],
       body:  [ [-36,-6], [-16,-16], [6,-16], [22,-4], [36,-2], [36,8], [-36,8] ],
@@ -49,11 +49,11 @@ window.HC = window.HC || {};
     },
     buggy: {
       name: 'Багги', order: 2,
-      about: 'Открытая рама и длинные рычаги. Прыгает охотно, садится мягко.',
+      about: 'Открытая рама и длинные рычаги. Быстрый, прыгучий, мягко садится.',
       price: 9000, priceOre: 0,
-      mass: 6.4, power: 12200, fuel: 85, burn: 2.3, topSpeed: 1080, react: 1.00, airCtrl: 1.40,
+      mass: 6.4, power: 16500, fuel: 85, burn: 2.4, topSpeed: 1200, react: 1.00, airCtrl: 1.45,
       drive: 'rear',
-      wheel: { r: 23, mass: 1.3, grip: 1.05 },
+      wheel: { r: 23, mass: 1.3, grip: 1.00 },
       susp:  { rest: 34, min: 12, max: 66, sag: 13, damp: 0.46 },
       axles: [ { x: -38, y: 2 }, { x: 38, y: 2 } ],
       body:  [ [-44,-4], [-38,-22], [-14,-30], [2,-14], [30,-12], [44,-4], [44,8], [-44,8] ],
@@ -61,11 +61,11 @@ window.HC = window.HC || {};
     },
     truck: {
       name: 'Грузовик', order: 3,
-      about: 'Тяжёлый и упрямый. Держит горку и везёт много топлива.',
+      about: 'Разгоняется лениво, зато не опрокидывается и везёт много топлива.',
       price: 18000, priceOre: 40,
-      mass: 15, power: 27000, fuel: 165, burn: 3.6, topSpeed: 820, react: 0.85, airCtrl: 0.78,
+      mass: 15, power: 19000, fuel: 165, burn: 3.2, topSpeed: 820, react: 0.85, airCtrl: 0.78,
       drive: 'rear',
-      wheel: { r: 26, mass: 2.6, grip: 1.12 },
+      wheel: { r: 26, mass: 2.6, grip: 1.20 },
       susp:  { rest: 30, min: 11, max: 48, sag: 8, damp: 0.62 },
       axles: [ { x: -46, y: 8 }, { x: 46, y: 8 } ],
       body:  [ [-62,-10], [-56,-34], [-20,-38], [-8,-16], [62,-14], [62,14], [-62,14] ],
@@ -73,11 +73,11 @@ window.HC = window.HC || {};
     },
     tractor: {
       name: 'Трактор', order: 4,
-      about: 'Огромное заднее колесо и вечная первая передача. Вползёт куда угодно.',
+      about: 'Самый медленный и самый цепкий. Вползёт по стене, но сальто не ждите.',
       price: 34000, priceOre: 90,
-      mass: 13, power: 24000, fuel: 140, burn: 3.2, topSpeed: 700, react: 0.95, airCtrl: 0.85,
+      mass: 13, power: 14000, fuel: 140, burn: 2.8, topSpeed: 660, react: 0.95, airCtrl: 0.85,
       drive: 'rear',
-      wheel: { r: 34, mass: 2.4, grip: 1.40 },
+      wheel: { r: 34, mass: 2.4, grip: 1.65 },
       susp:  { rest: 24, min: 9, max: 40, sag: 7, damp: 0.66 },
       axles: [ { x: -34, y: 2, r: 34 }, { x: 40, y: 12, r: 17, mass: 1.2 } ],
       body:  [ [-52,-6], [-46,-42], [-14,-46], [-8,-20], [48,-16], [48,10], [-52,10] ],
@@ -85,11 +85,11 @@ window.HC = window.HC || {};
     },
     monster: {
       name: 'Монстр-трак', order: 5,
-      about: 'Колёса выше кузова. Переезжает холмы, вместо того чтобы их объезжать.',
+      about: 'Колёса выше кузова: переезжает кочки, которых другие боятся. Тяжёлый и быстрый.',
       price: 60000, priceOre: 200,
-      mass: 17, power: 34000, fuel: 180, burn: 4.0, topSpeed: 950, react: 0.95, airCtrl: 0.92,
+      mass: 17, power: 27000, fuel: 180, burn: 3.7, topSpeed: 1000, react: 0.95, airCtrl: 0.92,
       drive: 'all',
-      wheel: { r: 35, mass: 3.0, grip: 1.22 },
+      wheel: { r: 35, mass: 3.0, grip: 1.30 },
       susp:  { rest: 36, min: 13, max: 62, sag: 10, damp: 0.58 },
       axles: [ { x: -42, y: -2 }, { x: 42, y: -2 } ],
       body:  [ [-50,-14], [-44,-36], [-6,-40], [8,-20], [52,-16], [52,8], [-50,8] ],
@@ -97,11 +97,11 @@ window.HC = window.HC || {};
     },
     rover: {
       name: 'Луноход', order: 6,
-      about: 'Липкий ход и почти неубиваемая подвеска. Едет там, где не едет никто.',
+      about: 'Липкое сцепление и неубиваемая подвеска. Едет там, где не едет никто.',
       price: 95000, priceOre: 350,
-      mass: 11, power: 20000, fuel: 200, burn: 3.0, topSpeed: 880, react: 1.00, airCtrl: 1.05,
+      mass: 11, power: 17000, fuel: 200, burn: 2.8, topSpeed: 900, react: 1.00, airCtrl: 1.05,
       drive: 'all',
-      wheel: { r: 33, mass: 2.0, grip: 1.35 },
+      wheel: { r: 33, mass: 2.0, grip: 1.50 },
       susp:  { rest: 38, min: 14, max: 64, sag: 12, damp: 0.55 },
       axles: [ { x: -42, y: 2 }, { x: 42, y: 2 } ],
       body:  [ [-50,-6], [-44,-26], [-4,-30], [10,-16], [52,-12], [52,10], [-50,10] ],
@@ -111,9 +111,9 @@ window.HC = window.HC || {};
       name: 'Вездеход 6×6', order: 7,
       about: 'Три оси и полный привод. Самый спокойный способ уехать далеко.',
       price: 150000, priceOre: 700,
-      mass: 19, power: 33000, fuel: 240, burn: 3.4, topSpeed: 780, react: 0.75, airCtrl: 0.70,
+      mass: 19, power: 24000, fuel: 240, burn: 3.2, topSpeed: 780, react: 0.75, airCtrl: 0.70,
       drive: 'all',
-      wheel: { r: 22, mass: 1.9, grip: 1.30 },
+      wheel: { r: 22, mass: 1.9, grip: 1.42 },
       susp:  { rest: 28, min: 10, max: 50, sag: 9, damp: 0.60 },
       axles: [ { x: -54, y: 8 }, { x: 0, y: 8 }, { x: 54, y: 8 } ],
       body:  [ [-70,-10], [-64,-32], [-22,-36], [-10,-16], [70,-12], [70,12], [-70,12] ],
@@ -129,25 +129,25 @@ window.HC = window.HC || {};
     hills: {
       name: 'Холмы', order: 0, price: 0, priceOre: 0,
       about: 'Мягкие волны. Место, куда возвращаются.',
-      amp: 150, len: 620, rough: 0.45, gravity: 1750,
+      amp: 150, len: 620, rough: 0.45, gravity: 1350,
       coinRate: 1.00, oreRate: 0.10, payout: 1.00
     },
     dunes: {
       name: 'Дюны', order: 1, price: 2500, priceOre: 0,
       about: 'Длинные пологие спуски. Топливо тает медленно.',
-      amp: 120, len: 950, rough: 0.30, gravity: 1750,
+      amp: 120, len: 950, rough: 0.30, gravity: 1330,
       coinRate: 1.15, oreRate: 0.12, payout: 1.25
     },
     ridge: {
       name: 'Хребет', order: 2, price: 9000, priceOre: 25,
       about: 'Круто вверх, круто вниз. Требует терпения.',
-      amp: 220, len: 950, rough: 0.70, gravity: 1800,
+      amp: 220, len: 950, rough: 0.70, gravity: 1420,
       coinRate: 0.95, oreRate: 0.28, payout: 1.75
     },
     moon: {
       name: 'Луна', order: 3, price: 30000, priceOre: 150,
       about: 'Гравитация вполсилы. Долгие тихие прыжки.',
-      amp: 200, len: 800, rough: 0.45, gravity: 620,
+      amp: 200, len: 800, rough: 0.45, gravity: 520,
       coinRate: 1.05, oreRate: 0.40, payout: 2.40
     }
   };
@@ -294,6 +294,9 @@ window.HC = window.HC || {};
     fuelPickup: 0.38,      // доля бака за канистру
     distancePer100: 6,     // монет за каждые 100 м
     recordBonus: 0.5,      // доля сверху за новый рекорд
+    flipCoins: 110,        // за первое сальто в прыжке; второе дороже вдвое и т.д.
+    airBonus: 55,          // за каждую секунду в воздухе, если прыжок был долгий
+    airMin: 1.1,           // с какого времени полёта идёт награда
     offlineHoursBase: 4,   // базовый потолок офлайн-копилки
     startCoins: 0
   };

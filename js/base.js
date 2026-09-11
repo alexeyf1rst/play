@@ -262,16 +262,61 @@ window.HC = window.HC || {};
     /* Деревья и камни по краям долины — чтобы это было место, а не полка */
     drawDecor: function (g, P) {
       var self = this;
-      // расставлено по промежуткам между участками, чтобы ничего не налезало
+      // обстановка базы: фонари вдоль дороги, башня, ящики, флагшток.
+      // Расставлено по промежуткам между участками, чтобы ничего не налезало.
       var items = [
-        { x: 230, row: 0, t: 'grass', s: 1.1 }, { x: 420, row: 0, t: 'bush', s: 1 },
-        { x: 610, row: 0, t: 'grass', s: 1 },   { x: 800, row: 0, t: 'rock', s: 0.85 },
-        { x: 990, row: 0, t: 'grass', s: 1.15 },{ x: 1155, row: 0, t: 'tree', s: 1.05 },
-        { x: 70,  row: 1, t: 'pine', s: 1.1 },  { x: 275, row: 1, t: 'rock', s: 0.8 },
-        { x: 445, row: 1, t: 'grass', s: 1.1 }, { x: 615, row: 1, t: 'bush', s: 0.95 },
-        { x: 785, row: 1, t: 'grass', s: 1 },   { x: 950, row: 1, t: 'rock', s: 0.75 },
-        { x: 1140, row: 1, t: 'tree', s: 1 },   { x: 1235, row: 1, t: 'pine', s: 1.15 }
+        { x: 232, row: 0, t: 'lamp', s: 1 },    { x: 420, row: 0, t: 'crates', s: 1 },
+        { x: 612, row: 0, t: 'lamp', s: 1 },    { x: 800, row: 0, t: 'rock', s: 0.85 },
+        { x: 1100, row: 0, t: 'lamp', s: 1 },   { x: 60, row: 0, t: 'grass', s: 1.1 },
+        { x: 70,  row: 1, t: 'tower', s: 1 },   { x: 272, row: 1, t: 'crates', s: 0.9 },
+        { x: 448, row: 1, t: 'grass', s: 1.1 }, { x: 614, row: 1, t: 'bush', s: 0.95 },
+        { x: 786, row: 1, t: 'grass', s: 1 },   { x: 952, row: 1, t: 'flagpole', s: 1 },
+        { x: 1142, row: 1, t: 'tree', s: 1 },   { x: 1238, row: 1, t: 'pine', s: 1.15 }
       ];
+      // ограда по переднему краю: база становится огороженной территорией
+      g.save();
+      g.strokeStyle = P.ink;
+      g.globalAlpha = 0.55;
+      g.lineWidth = 2;
+      g.lineCap = 'round';
+      for (var fx = 8; fx < 1272; fx += 26) {
+        if (fx > 1152 && fx < 1278) continue;        // проём под ворота
+        var fy = lowerY(fx) + 40;
+        g.beginPath(); g.moveTo(fx, fy); g.lineTo(fx, fy - 20); g.stroke();
+      }
+      g.lineWidth = 1.7;
+      g.beginPath();
+      for (var fx2 = 8; fx2 < 1272; fx2 += 13) {
+        if (fx2 > 1152 && fx2 < 1278) { g.moveTo(fx2, lowerY(fx2) + 26); continue; }
+        g.lineTo(fx2, lowerY(fx2) + 26);
+      }
+      g.stroke();
+      g.beginPath();
+      for (var fx3 = 8; fx3 < 1272; fx3 += 13) {
+        if (fx3 > 1152 && fx3 < 1278) { g.moveTo(fx3, lowerY(fx3) + 34); continue; }
+        g.lineTo(fx3, lowerY(fx3) + 34);
+      }
+      g.stroke();
+      g.restore();
+      g.globalAlpha = 1;
+
+      // узкоколейка вдоль верхнего яруса — она связывает шахты
+      g.save();
+      g.strokeStyle = P.ink;
+      g.globalAlpha = 0.4;
+      g.lineWidth = 1.6;
+      for (var rx = 40; rx < 1240; rx += 14) {
+        g.beginPath(); g.moveTo(rx, upperY(rx) + 12); g.lineTo(rx, upperY(rx) + 18); g.stroke();
+      }
+      g.lineWidth = 1.8;
+      [13, 17].forEach(function (off) {
+        g.beginPath();
+        for (var rx2 = 40; rx2 <= 1240; rx2 += 14) g.lineTo(rx2, upperY(rx2) + off);
+        g.stroke();
+      });
+      g.restore();
+      g.globalAlpha = 1;
+
       items.forEach(function (d) {
         var y = d.row ? upperY(d.x) : lowerY(d.x);
         g.save();
@@ -283,25 +328,34 @@ window.HC = window.HC || {};
       self.drawSign(g, P);
     },
 
-    /* Указатель на въезде */
+    /* Ворота с вывеской на въезде */
     drawSign: function (g, P) {
-      var x = 42, y = lowerY(x);
+      var x = 1214, y = lowerY(x);
       g.save();
       g.translate(x, y);
-      HC.Decor.shadow(g, P, 14, 0.2);
+      // столбы ворот
+      g.strokeStyle = P.ink; g.lineWidth = 4;
+      g.beginPath(); g.moveTo(-52, 6); g.lineTo(-52, -74); g.moveTo(52, 6); g.lineTo(52, -74); g.stroke();
+      g.lineWidth = 3;
+      g.beginPath(); g.moveTo(-56, -74); g.quadraticCurveTo(0, -92, 56, -74); g.stroke();
+      g.lineWidth = 2;
+      g.beginPath(); g.moveTo(-52, -60); g.lineTo(-38, -74); g.moveTo(52, -60); g.lineTo(38, -74); g.stroke();
+      g.translate(0, -18);
       g.strokeStyle = P.ink; g.lineWidth = 3;
-      g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -52); g.stroke();
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -34); g.stroke();
       var sg = g.createLinearGradient(0, -62, 0, -34);
       sg.addColorStop(0, P.bodyHi || P.bodyFill);
       sg.addColorStop(1, P.bodyShade || P.bodyFill);
       g.fillStyle = sg; g.lineWidth = 2.2;
       g.beginPath();
-      g.moveTo(-30, -62); g.lineTo(46, -62); g.lineTo(58, -48); g.lineTo(46, -34); g.lineTo(-30, -34);
+      g.moveTo(-44, -50); g.lineTo(44, -50); g.lineTo(44, -30); g.lineTo(-44, -30);
       g.closePath(); g.fill(); g.stroke();
       g.fillStyle = P.ink;
       g.font = '600 13px ui-sans-serif, system-ui, sans-serif';
       g.textAlign = 'center';
-      g.fillText('долина', 10, -43);
+      g.textBaseline = 'middle';
+      g.fillText('ДОЛИНА', 0, -39);
+      g.textBaseline = 'alphabetic';
       g.restore();
     },
 
@@ -331,7 +385,7 @@ window.HC = window.HC || {};
     drawParked: function (g, P, state) {
       var def = HC.VEHICLES[state.vehicle];
       if (!def) return;
-      var x = 1243, y = lowerY(x) + 4;
+      var x = 995, y = lowerY(x) + 4;
       g.save();
       g.translate(x, y);
       g.scale(0.82, 0.82);

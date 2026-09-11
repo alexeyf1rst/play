@@ -41,6 +41,81 @@ window.HC = window.HC || {};
     return k * k * (3 - 2 * k);
   };
 
+  /* --- Фигуры на трассе -----------------------------------
+     Одних холмов мало: без трамплинов машина просто катится.
+     Поэтому поверх шума кладутся трамплины, столы, ямы и кочки —
+     детерминированно, из того же семечка.
+  */
+  var FEAT = 1500;         // одна фигура на такой отрезок
+
+  var SHAPES = {
+    // трамплин: пологий заход, крутая губа на гребне, обрыв за ней.
+    // Губа и подбрасывает — без неё машина просто переваливает холм.
+    ramp: function (t) {
+      if (t < 0.50) { var u = t / 0.50; return 0.42 * u * u * (3 - 2 * u); }
+      if (t < 0.70) { var v = (t - 0.50) / 0.20; return 0.42 + 0.58 * v * v * (3 - 2 * v); }
+      var w = (t - 0.70) / 0.30;
+      return 1 - w * w * (3 - 2 * w);
+    },
+    // стол: заход, площадка, съезд
+    table: function (t) {
+      if (t < 0.34) { var u = t / 0.34; return u * u * (3 - 2 * u); }
+      if (t < 0.66) return 1;
+      var v = (t - 0.66) / 0.34;
+      return 1 - v * v * (3 - 2 * v);
+    },
+    // яма
+    gap: function (t) {
+      return -Math.sin(t * Math.PI) * Math.sin(t * Math.PI);
+    },
+    // череда кочек
+    bumps: function (t) {
+      return Math.sin(t * Math.PI) * (0.5 + 0.5 * Math.sin(t * Math.PI * 3.5));
+    }
+  };
+
+  Terrain.prototype.feature = function (k) {
+    this.feat = this.feat || {};
+    if (this.feat[k] !== undefined) return this.feat[k];
+    var f = null;
+    if (k * FEAT > 3600) {
+      var r = hash(k, this.seed + 301);
+      var type = r < 0.40 ? 'ramp' : (r < 0.66 ? 'table' : (r < 0.86 ? 'gap' : 'bumps'));
+      var w = 380 + hash(k, this.seed + 303) * 320;
+      // высота считается от ширины: так крутизна фигуры всегда в рамках,
+      // а не зависит от того, какие числа выпали
+      var ratio = { ramp: 0.155, table: 0.18, gap: 0.30, bumps: 0.075 }[type];
+      var amp = w * ratio * (0.75 + hash(k, this.seed + 304) * 0.5);
+      f = {
+        type: type,
+        cx: k * FEAT + w / 2 + hash(k, this.seed + 302) * (FEAT - w - 120),
+        w: w,
+        a: amp
+      };
+    }
+    this.feat[k] = f;
+    return f;
+  };
+
+  /* Вклад фигур в высоту в точке x.
+     Первые полторы сотни метров фигур нет совсем, дальше они входят
+     в силу постепенно — иначе новичок улетает с трамплина на 80-м метре. */
+  Terrain.prototype.featureH = function (x) {
+    var warm = clamp((x - 3600) / 11000, 0, 1);
+    if (warm <= 0) return 0;
+    warm = warm * warm * (3 - 2 * warm);
+    var h = 0;
+    var k0 = Math.floor((x - FEAT) / FEAT), k1 = Math.floor((x + FEAT) / FEAT);
+    for (var k = k0; k <= k1; k++) {
+      var f = this.feature(k);
+      if (!f) continue;
+      var t = (x - (f.cx - f.w / 2)) / f.w;
+      if (t <= 0 || t >= 1) continue;
+      h += f.a * SHAPES[f.type](t);
+    }
+    return h * warm;
+  };
+
   /* Сумма октав шума — "сырая" форма холмов. */
   Terrain.prototype.raw = function (x) {
     var t = this.track, s = this.seed, L = t.len;
@@ -51,6 +126,7 @@ window.HC = window.HC || {};
     h += vnoise(x / (L * 0.43) + 17.3, s + 101) * amp * 0.45 * rough;
     h += vnoise(x / (L * 0.19) + 51.7, s + 202) * amp * 0.18 * rough;
     h += vnoise(x / (L * 3.10) + 7.10, s + 303) * amp * 1.10;   // длинная пологая волна
+    h += this.featureH(x) * (0.68 + 0.38 * k);                   // трамплины и ямы
     return h;
   };
 
@@ -83,7 +159,7 @@ window.HC = window.HC || {};
       var t = this.track;
       var r1 = hash(k, this.seed + 7), r2 = hash(k, this.seed + 8), r3 = hash(k, this.seed + 9);
 
-      if (r1 < 0.075 * t.coinRate) {
+      if (r1 < 0.085 * t.coinRate) {
         var n = 2 + Math.floor(hash(k, this.seed + 11) * 3);
         var arc = hash(k, this.seed + 12) < 0.4;
         for (var i = 0; i < n; i++) {
@@ -124,7 +200,7 @@ window.HC = window.HC || {};
      Расставлены из семечка: пейзаж у трассы всегда свой,
      но от заезда к заезду не прыгает.
   */
-  var DEC = 105;    // шаг раскладки
+  var DEC = 74;     // шаг раскладки
 
   Terrain.prototype.decorCell = function (k) {
     this.dec = this.dec || {};
@@ -132,14 +208,22 @@ window.HC = window.HC || {};
     var set = HC.DECOR_SETS[this.trackId] || HC.DECOR_SETS.hills;
     var out = [];
     var r = hash(k, this.seed + 41);
-    if (r < 0.62) {
-      var pick = set[Math.floor(hash(k, this.seed + 42) * set.length)];
-      var x = k * DEC + hash(k, this.seed + 43) * DEC * 0.8;
+    if (r < 0.72) {
       out.push({
-        type: pick, x: x,
+        type: set[Math.floor(hash(k, this.seed + 42) * set.length)],
+        x: k * DEC + hash(k, this.seed + 43) * DEC * 0.8,
         s: 0.75 + hash(k, this.seed + 44) * 0.5,
         flip: hash(k, this.seed + 45) < 0.5
       });
+      // иногда рядом встаёт второй предмет — получается кучка, а не строй
+      if (hash(k, this.seed + 46) < 0.34) {
+        out.push({
+          type: set[Math.floor(hash(k, this.seed + 47) * set.length)],
+          x: k * DEC + 22 + hash(k, this.seed + 48) * DEC * 0.5,
+          s: 0.6 + hash(k, this.seed + 49) * 0.4,
+          flip: hash(k, this.seed + 50) < 0.5
+        });
+      }
     }
     this.dec[k] = out;
     return out;

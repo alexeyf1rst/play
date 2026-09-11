@@ -279,6 +279,13 @@ window.HC = window.HC || {};
       src.connect(filt); filt.connect(g); g.connect(sfxBus);
       src.start(t); src.stop(t + 0.9);
     },
+    flip: function (n) {
+      var self = this;
+      var base = 72 + Math.min(n - 1, 3) * 4;
+      [0, 4, 7].forEach(function (step, i) {
+        setTimeout(function () { self.blip(mtof(base + step), 0.7, 0.085, 'sine'); }, i * 70);
+      });
+    },
     // мягкий аккорд в конце заезда
     chime: function () {
       var self = this;

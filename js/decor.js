@@ -10,9 +10,9 @@ window.HC = window.HC || {};
 
   /* Наборы для разных мест. Первым идёт то, что встречается чаще. */
   HC.DECOR_SETS = {
-    hills:  ['tree', 'tree', 'bush', 'pine', 'rock', 'fence', 'pole', 'grass', 'grass'],
-    dunes:  ['bush', 'grass', 'rock', 'cactus', 'cactus', 'grass', 'skull'],
-    ridge:  ['pine', 'pine', 'rock', 'rock', 'bush', 'pole', 'grass'],
+    hills:  ['tree', 'tree', 'bush', 'pine', 'rock', 'fence', 'pole', 'grass', 'grass', 'lamp', 'crates'],
+    dunes:  ['bush', 'grass', 'rock', 'cactus', 'cactus', 'grass', 'skull', 'crates', 'lamp'],
+    ridge:  ['pine', 'pine', 'rock', 'rock', 'bush', 'pole', 'grass', 'crates', 'flagpole'],
     moon:   ['rock', 'rock', 'crater', 'flag', 'rock', 'crater'],
     base:   ['tree', 'bush', 'grass', 'rock', 'fence', 'pine']
   };
@@ -161,6 +161,74 @@ window.HC = window.HC || {};
       g.globalAlpha = 0.8;
       g.beginPath(); g.ellipse(0, -2, 24, 6, 0, 0, 6.3); g.fill(); g.stroke();
       g.globalAlpha = 1;
+    },
+    /* Фонарь вдоль дороги */
+    lamp: function (g, P) {
+      g.strokeStyle = P.ink; g.lineWidth = 2.6; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -58); g.stroke();
+      g.lineWidth = 2.2;
+      g.beginPath(); g.moveTo(0, -58); g.quadraticCurveTo(0, -68, 12, -68); g.stroke();
+      var lg = g.createLinearGradient(0, -70, 0, -58);
+      lg.addColorStop(0, P.bodyHi || P.bodyFill);
+      lg.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = lg;
+      g.beginPath();
+      g.moveTo(6, -68); g.lineTo(18, -68); g.lineTo(15, -59); g.lineTo(9, -59);
+      g.closePath(); g.fill(); g.stroke();
+      g.beginPath(); g.moveTo(-5, 0); g.lineTo(5, 0); g.stroke();
+    },
+    /* Водонапорная башня */
+    tower: function (g, P) {
+      g.strokeStyle = P.ink; g.lineWidth = 2.4;
+      g.beginPath();
+      g.moveTo(-20, 0); g.lineTo(-11, -46); g.moveTo(20, 0); g.lineTo(11, -46);
+      g.stroke();
+      g.lineWidth = 1.6;
+      g.beginPath(); g.moveTo(-17, -18); g.lineTo(17, -18); g.moveTo(-14, -32); g.lineTo(14, -32); g.stroke();
+      g.beginPath(); g.moveTo(-17, -18); g.lineTo(14, -32); g.moveTo(17, -18); g.lineTo(-14, -32); g.stroke();
+      var tg = g.createLinearGradient(-18, -76, 18, -46);
+      tg.addColorStop(0, P.bodyHi || P.bodyFill);
+      tg.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = tg; g.lineWidth = 2.4;
+      g.beginPath(); g.rect(-18, -72, 36, 26); g.fill(); g.stroke();
+      g.beginPath();
+      g.moveTo(-22, -72); g.lineTo(0, -88); g.lineTo(22, -72);
+      g.closePath(); g.fill(); g.stroke();
+      g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(-18, -62); g.lineTo(18, -62); g.stroke();
+    },
+    /* Ящики */
+    crates: function (g, P) {
+      var cg = g.createLinearGradient(0, -34, 0, 0);
+      cg.addColorStop(0, P.bodyHi || P.bodyFill);
+      cg.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = cg; g.strokeStyle = P.ink; g.lineWidth = 2.2;
+      function box(x, y, w2, h2) {
+        g.beginPath(); g.rect(x, y, w2, h2); g.fill(); g.stroke();
+        g.lineWidth = 1.3;
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + w2, y + h2); g.moveTo(x + w2, y); g.lineTo(x, y + h2); g.stroke();
+        g.lineWidth = 2.2;
+      }
+      box(-22, -17, 17, 17);
+      box(-3, -15, 15, 15);
+      box(-16, -32, 16, 15);
+    },
+    /* Флагшток */
+    flagpole: function (g, P, t) {
+      g.strokeStyle = P.ink; g.lineWidth = 2.6; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -76); g.stroke();
+      g.lineWidth = 2.2;
+      var fg = g.createLinearGradient(0, -76, 30, -56);
+      fg.addColorStop(0, P.bodyHi || P.bodyFill);
+      fg.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = fg;
+      g.beginPath();
+      g.moveTo(1, -74);
+      g.quadraticCurveTo(16, -70, 30, -74);
+      g.lineTo(30, -58);
+      g.quadraticCurveTo(16, -54, 1, -58);
+      g.closePath(); g.fill(); g.stroke();
+      g.beginPath(); g.arc(0, -78, 3, 0, 6.3); g.fill(); g.stroke();
     },
     /* Флажок на Луне */
     flag: function (g, P) {

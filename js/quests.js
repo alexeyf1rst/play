@@ -74,24 +74,48 @@ window.HC = window.HC || {};
       h = Math.imul(h, 16777619);
     }
     var state = h >>> 0;
-    return function () {
+    function next() {
       state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
       return state / 4294967296;
-    };
+    }
+    // первые значения такого генератора коррелируют с семечком, а семечко —
+    // это дата: без прогрева в соседние дни выпадало бы одно и то же
+    for (var w = 0; w < 12; w++) next();
+    return next;
   }
 
   function roundTo(v, step) { return Math.max(step, Math.round(v / step) * step); }
+
+  /* Задания разбиты по смыслу. В каждом списке обязательно есть трюковое —
+     иначе выпадали одни «проехать столько-то метров», и это скучно. */
+  var GROUPS = {
+    trick: ['flips', 'air', 'cans'],
+    move:  ['dist_run', 'dist_total', 'track_dist'],
+    money: ['coins_run', 'coins_earn', 'ore'],
+    base:  ['collect', 'build', 'runs']
+  };
 
   /* Собираем список заданий на период. Без повторов типов. */
   function build(period, key, state) {
     var P = HC.QUEST_PERIODS[period];
     var r = rng(key, period);
-    var kinds = Object.keys(HC.QUEST_KINDS);
-    // перемешиваем по seed — список будет стабильным весь период
-    for (var i = kinds.length - 1; i > 0; i--) {
-      var j = Math.floor(r() * (i + 1));
-      var tmp = kinds[i]; kinds[i] = kinds[j]; kinds[j] = tmp;
+
+    function shuffle(arr) {
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(r() * (i + 1));
+        var t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a;
     }
+
+    // трюки и движение — всегда; остальное добирается по жребию
+    var order = ['trick', 'move'].concat(shuffle(['money', 'base']));
+    var kinds = [];
+    order.forEach(function (gname) { kinds.push(shuffle(GROUPS[gname])[0]); });
+    // если нужно больше заданий, чем групп — добираем оставшимися типами
+    var rest = shuffle(Object.keys(HC.QUEST_KINDS).filter(function (k) { return kinds.indexOf(k) < 0; }));
+    kinds = kinds.concat(rest);
     var openTracks = Object.keys(HC.TRACKS).filter(function (t) { return state.tracks[t]; });
     var list = [];
     for (var k = 0; k < kinds.length && list.length < P.count; k++) {
