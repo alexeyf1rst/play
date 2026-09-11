@@ -115,8 +115,7 @@ window.HC = window.HC || {};
       if (vw >= VW) { this.pan = (VW - vw) / 2; this.padX = 0; }
       else this.pan = clamp(this.pan, 0, VW - vw);
       this.padX = 0;
-      this.padY = (H - VH * this.scale) / 2;
-      if (this.padY > 0) this.padY = Math.min(this.padY, H - VH * this.scale);
+      this.padY = Math.max(0, (H - VH * this.scale) / 2);
     },
 
     toVirtual: function (sx, sy) {

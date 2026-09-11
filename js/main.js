@@ -96,7 +96,16 @@ window.HC = window.HC || {};
         if (k === 'ArrowLeft' || k === 'a' || k === 'A' || k === 'ф' || k === 'Ф') { self.keys.brake = down; e.preventDefault(); }
         if (down && k === 'Escape') self.togglePause();
       }
-      window.addEventListener('keydown', function (e) { HC.Audio.unlock(); keyFlag(e, true); });
+      // первое касание/нажатие где угодно — браузеру этого хватает, чтобы разрешить звук
+      var unlockOnce = function () {
+        HC.Audio.unlock();
+        document.removeEventListener('pointerdown', unlockOnce, true);
+        document.removeEventListener('keydown', unlockOnce, true);
+      };
+      document.addEventListener('pointerdown', unlockOnce, true);
+      document.addEventListener('keydown', unlockOnce, true);
+
+      window.addEventListener('keydown', function (e) { keyFlag(e, true); });
       window.addEventListener('keyup', function (e) { keyFlag(e, false); });
       window.addEventListener('blur', function () { self.keys.gas = self.keys.brake = false; });
 

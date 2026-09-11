@@ -256,7 +256,10 @@ window.HC = window.HC || {};
                 if (!pay(v.price, v.priceOre)) return;
                 G.state.owned[id] = true;
                 G.state.vehicle = id;
-                G.state.up[id] = G.state.up[id] || {};
+                if (!G.state.up[id]) {
+                  G.state.up[id] = {};
+                  for (var uid in HC.UPGRADES) G.state.up[id][uid] = 0;
+                }
                 HC.Audio.build();
                 UI.toast('Куплена ' + v.name);
                 HC.save(G.state, true); UI.refresh();

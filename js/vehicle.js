@@ -272,11 +272,30 @@ window.HC = window.HC || {};
     }
   };
 
+  /* Если физику всё-таки унесёт в бесконечность — не роняем игру,
+     а откатываемся на последнее живое положение и заканчиваем заезд. */
+  Vehicle.prototype.recover = function () {
+    var p = this.lastGood || { x: this.startX, y: this.terrain.height(this.startX) - 60 };
+    this.pos = { x: p.x, y: p.y };
+    this.vel = { x: 0, y: 0 };
+    this.ang = 0; this.angVel = 0;
+    var self = this;
+    this.wheels.forEach(function (w) {
+      w.pos.x = self.pos.x + w.lx;
+      w.pos.y = self.pos.y + w.ly + self.suspRest;
+      w.vel.x = 0; w.vel.y = 0; w.spin = 0;
+    });
+    this.crashed = true;
+  };
+
   /* --- Кадр ----------------------------------------------- */
   Vehicle.prototype.update = function (dt, input) {
     var n = HC.WORLD.substeps;
     var h = dt / n;
     for (var i = 0; i < n; i++) this.step(h, input);
+
+    if (isFinite(this.pos.x + this.pos.y + this.ang)) this.lastGood = { x: this.pos.x, y: this.pos.y };
+    else this.recover();
 
     // топливо
     if (!this.crashed && this.fuel > 0) {
@@ -291,7 +310,8 @@ window.HC = window.HC || {};
       this.airTime += dt;
       this.spinAccum += this.angVel * dt;
     }
-    this.distance = Math.max(this.distance, (this.pos.x - this.startX) / HC.PPM);
+    var d = (this.pos.x - this.startX) / HC.PPM;
+    if (isFinite(d)) this.distance = Math.max(this.distance, d);
     this.speed = Math.sqrt(this.vel.x * this.vel.x + this.vel.y * this.vel.y);
   };
 
