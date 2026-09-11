@@ -159,7 +159,7 @@ window.HC = window.HC || {};
       var t = this.track;
       var r1 = hash(k, this.seed + 7), r2 = hash(k, this.seed + 8), r3 = hash(k, this.seed + 9);
 
-      if (r1 < 0.085 * t.coinRate) {
+      if (r1 < 0.055 * t.coinRate) {
         var n = 2 + Math.floor(hash(k, this.seed + 11) * 3);
         var arc = hash(k, this.seed + 12) < 0.4;
         for (var i = 0; i < n; i++) {
@@ -236,6 +236,38 @@ window.HC = window.HC || {};
       for (var i = 0; i < c.length; i++) out.push(c[i]);
     }
     return out;
+  };
+
+  /* --- Деревья на дороге (трасса «Лес») -------------------
+     Стоят прямо на пути: объехать нельзя, снести можно, но машина
+     теряет ход. Сломанные помнятся до конца заезда.
+  */
+  var TREE = 320;
+
+  Terrain.prototype.treesIn = function (x0, x1) {
+    if (!this.track.trees) return [];
+    this.brokenTrees = this.brokenTrees || {};
+    var out = [];
+    for (var k = Math.floor(x0 / TREE); k <= Math.floor(x1 / TREE); k++) {
+      if (k * TREE < 900) continue;                 // у старта пусто
+      if (hash(k, this.seed + 61) > 0.42) continue;
+      var x = k * TREE + hash(k, this.seed + 62) * TREE * 0.7;
+      out.push({
+        id: k,
+        x: x,
+        s: 0.95 + hash(k, this.seed + 63) * 0.55,
+        kind: hash(k, this.seed + 64) < 0.5 ? 'pine' : 'tree',
+        broken: this.brokenTrees[k] || 0
+      });
+    }
+    return out;
+  };
+
+  Terrain.prototype.breakTree = function (id) {
+    this.brokenTrees = this.brokenTrees || {};
+    if (this.brokenTrees[id]) return false;
+    this.brokenTrees[id] = 1;
+    return true;
   };
 
   /* Мелочь на дальних холмах — только силуэты, для глубины. */

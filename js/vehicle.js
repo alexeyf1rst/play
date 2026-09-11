@@ -35,9 +35,15 @@ window.HC = window.HC || {};
     // короткая передача даёт тягу, длинная — скорость
     this.power = def.power * E.engine(lu.engine) / Math.sqrt(gear);
     this.topSpeed = def.topSpeed * (1 + lu.engine * 0.018) * Math.pow(gear, 0.6);
+    // покрытие трассы: песок вязкий и скользкий, асфальт наоборот
+    var surf = (terrain && terrain.track) || {};
+    this.surfGrip = surf.grip || 1;
+    this.surfRoll = surf.roll || 1;
+    this.lift = def.lift || 0;          // луноход слегка парит
+
     // низкое давление — цепче, но хуже катится
-    this.grip = def.wheel.grip * E.tires(lu.tires) * (1.30 - 0.30 * press);
-    this.rollFree = 0.5 * (1.70 - 0.70 * press);
+    this.grip = def.wheel.grip * E.tires(lu.tires) * (1.30 - 0.30 * press) * this.surfGrip;
+    this.rollFree = 0.5 * (1.70 - 0.70 * press) * this.surfRoll;
     // отзывчивость в воздухе: общая настройка × характер машины × ползунок тюнинга
     var airBase = def.airCtrl || 1;
     this.airK = HC.WORLD.airControl * airBase * airk;
@@ -149,6 +155,9 @@ window.HC = window.HC || {};
     var throttle = this.crashed ? 0 : input.throttle;
     if (this.fuel <= 0) throttle = 0;
 
+    // в воздухе луноход падает медленнее — он «немного летает»
+    if (this.lift && !this.onGround) g *= (1 - this.lift);
+
     this.vel.y += g * h;
 
     var anyContact = false;
@@ -247,6 +256,13 @@ window.HC = window.HC || {};
       w.vel.x += tan.x * j / w.mass;
       w.vel.y += tan.y * j / w.mass;
       w.spin += (rho.x * (tan.y * j) - rho.y * (tan.x * j)) / w.I;
+
+      // вязкое покрытие тормозит колесо, пока оно касается земли
+      if (this.surfRoll > 1) {
+        var sink = (this.surfRoll - 1) * 1.5 * h;
+        w.vel.x -= w.vel.x * sink;
+        w.spin -= w.spin * sink;
+      }
       // отдача двигателя на кузов: ровно та тяга, что ушла в землю.
       // Из-за неё машина и встаёт на дыбы — но только когда колесо реально гребёт.
       this.angVel -= j * w.r * (this.def.react || 1) / this.I;

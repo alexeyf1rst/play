@@ -179,6 +179,57 @@ window.HC = window.HC || {};
     windSrc = { src: src, lfo: lfo };
   }
 
+  /* --- Двигатель -------------------------------------------
+     Ноты нет — есть пила, частота которой идёт за оборотами колеса.
+     Плюс шум пробуксовки и ветер на скорости. Всё считается на месте.
+  */
+  var eng = null;
+
+  function engineStart() {
+    if (!ensureCtx() || eng) return;
+    var t = ctx.currentTime;
+
+    var o1 = ctx.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = 70;
+    var o2 = ctx.createOscillator(); o2.type = 'square';   o2.frequency.value = 35;
+    var filt = ctx.createBiquadFilter();
+    filt.type = 'lowpass'; filt.frequency.value = 500; filt.Q.value = 3.5;
+    var g1 = ctx.createGain(); g1.gain.value = 0.0001;
+    var g2 = ctx.createGain(); g2.gain.value = 0.0001;
+
+    // пробуксовка
+    var ns = ctx.createBufferSource(); ns.buffer = noiseBuffer(2); ns.loop = true;
+    var nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 2100; nf.Q.value = 0.9;
+    var ng = ctx.createGain(); ng.gain.value = 0.0001;
+
+    // ветер на скорости
+    var ws = ctx.createBufferSource(); ws.buffer = noiseBuffer(3); ws.loop = true;
+    var wf = ctx.createBiquadFilter(); wf.type = 'lowpass'; wf.frequency.value = 700;
+    var wg = ctx.createGain(); wg.gain.value = 0.0001;
+
+    o1.connect(g1); g1.connect(filt);
+    o2.connect(g2); g2.connect(filt);
+    filt.connect(sfxBus);
+    ns.connect(nf); nf.connect(ng); ng.connect(sfxBus);
+    ws.connect(wf); wf.connect(wg); wg.connect(sfxBus);
+
+    o1.start(t); o2.start(t); ns.start(t); ws.start(t);
+    eng = { o1: o1, o2: o2, filt: filt, g1: g1, g2: g2, ng: ng, wg: wg, ns: ns, ws: ws };
+  }
+
+  function engineStop() {
+    if (!eng) return;
+    var t = ctx.currentTime;
+    [eng.g1, eng.g2, eng.ng, eng.wg].forEach(function (g) {
+      g.gain.cancelScheduledValues(t);
+      g.gain.setTargetAtTime(0.0001, t, 0.05);
+    });
+    var e = eng;
+    eng = null;
+    setTimeout(function () {
+      try { e.o1.stop(); e.o2.stop(); e.ns.stop(); e.ws.stop(); } catch (err) { /* уже остановлено */ }
+    }, 300);
+  }
+
   /* --- Публичный интерфейс -------------------------------- */
   HC.Audio = {
     applySettings: function (s) {
@@ -193,6 +244,24 @@ window.HC = window.HC || {};
       sfxBus.gain.cancelScheduledValues(t);
       sfxBus.gain.linearRampToValueAtTime(settings.sfx ? settings.sfxVol : 0, t + 0.1);
       if (settings.music && !running) HC.Audio.start();
+    },
+
+    engineStart: engineStart,
+    engineStop: engineStop,
+
+    /* rpm 0..1.3, газ 0..1, буксует 0..1, скорость 0..1 */
+    engine: function (rpm, thr, slip, spd) {
+      if (!eng || !ctx) return;
+      var t = ctx.currentTime;
+      var f = 58 + rpm * 215;
+      eng.o1.frequency.setTargetAtTime(f, t, 0.035);
+      eng.o2.frequency.setTargetAtTime(f * 0.5, t, 0.035);
+      eng.filt.frequency.setTargetAtTime(360 + rpm * 1700 + thr * 800, t, 0.05);
+      var load = 0.30 + 0.70 * rpm;
+      eng.g1.gain.setTargetAtTime((0.030 + 0.055 * thr) * load, t, 0.06);
+      eng.g2.gain.setTargetAtTime((0.018 + 0.030 * thr) * load, t, 0.06);
+      eng.ng.gain.setTargetAtTime(0.0001 + slip * 0.055, t, 0.05);
+      eng.wg.gain.setTargetAtTime(0.0001 + Math.max(0, spd - 0.4) * 0.075, t, 0.12);
     },
 
     // Браузер разрешает звук только после действия пользователя
@@ -214,6 +283,7 @@ window.HC = window.HC || {};
 
     stop: function () {
       running = false;
+      engineStop();
       clearTimers();
       if (!ctx) return;
       try {
@@ -279,6 +349,23 @@ window.HC = window.HC || {};
       src.connect(filt); filt.connect(g); g.connect(sfxBus);
       src.start(t); src.stop(t + 0.9);
     },
+    crack: function () {
+      if (!ctx || !settings.sfx) return;
+      var t = ctx.currentTime;
+      var src = ctx.createBufferSource();
+      src.buffer = noiseBuffer(0.5);
+      var filt = ctx.createBiquadFilter();
+      filt.type = 'bandpass';
+      filt.frequency.setValueAtTime(1400, t);
+      filt.frequency.exponentialRampToValueAtTime(320, t + 0.3);
+      filt.Q.value = 1.2;
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0.14, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+      src.connect(filt); filt.connect(g); g.connect(sfxBus);
+      src.start(t); src.stop(t + 0.5);
+    },
+
     flip: function (n) {
       var self = this;
       var base = 72 + Math.min(n - 1, 3) * 4;

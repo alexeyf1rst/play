@@ -28,9 +28,9 @@ window.HC = window.HC || {};
   };
 
   HC.QUEST_PERIODS = {
-    daily:   { name: 'На день',   tab: 'День',   count: 3, factor: 1,   idx: 0, coins: [320, 620],     ore: [0, 0] },
-    weekly:  { name: 'На неделю', tab: 'Неделя', count: 3, factor: 4.5, idx: 1, coins: [2000, 3800],   ore: [10, 22] },
-    monthly: { name: 'На месяц',  tab: 'Месяц',  count: 2, factor: 16,  idx: 2, coins: [11000, 19000], ore: [60, 120] }
+    daily:   { name: 'На день',   tab: 'День',   count: 3, factor: 1,   idx: 0, coins: [1600, 3100],   ore: [0, 0] },
+    weekly:  { name: 'На неделю', tab: 'Неделя', count: 3, factor: 4.5, idx: 1, coins: [10000, 19000], ore: [10, 22] },
+    monthly: { name: 'На месяц',  tab: 'Месяц',  count: 2, factor: 16,  idx: 2, coins: [55000, 95000], ore: [60, 120] }
   };
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -116,7 +116,7 @@ window.HC = window.HC || {};
     // если нужно больше заданий, чем групп — добираем оставшимися типами
     var rest = shuffle(Object.keys(HC.QUEST_KINDS).filter(function (k) { return kinds.indexOf(k) < 0; }));
     kinds = kinds.concat(rest);
-    var openTracks = Object.keys(HC.TRACKS).filter(function (t) { return state.tracks[t]; });
+    var openTracks = Object.keys(HC.TRACKS).filter(function (t) { return HC.trackOpen(state, t); });
     var list = [];
     for (var k = 0; k < kinds.length && list.length < P.count; k++) {
       var kind = HC.QUEST_KINDS[kinds[k]];

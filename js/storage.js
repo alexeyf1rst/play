@@ -79,7 +79,15 @@ window.HC = window.HC || {};
     s.tracks = s.tracks || { hills: true };
     s.tracks.hills = true;
     if (!HC.VEHICLES[s.vehicle] || !s.owned[s.vehicle]) s.vehicle = 'jeep';
-    if (!HC.TRACKS[s.track] || !s.tracks[s.track]) s.track = 'hills';
+    if (!HC.TRACKS[s.track]) s.track = 'hills';
+    // рекорды нужны только по существующим трассам
+    var cleanBest = {};
+    for (var tb in (s.stats && s.stats.best) || {}) {
+      if (HC.TRACKS[tb] && typeof s.stats.best[tb] === 'number' && isFinite(s.stats.best[tb])) {
+        cleanBest[tb] = s.stats.best[tb];
+      }
+    }
+    if (s.stats) s.stats.best = cleanBest;
 
     // прокачка и тюнинг — свои на каждую машину
     s.up = s.up || {};

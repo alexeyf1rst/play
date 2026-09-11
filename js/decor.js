@@ -11,8 +11,9 @@ window.HC = window.HC || {};
   /* Наборы для разных мест. Первым идёт то, что встречается чаще. */
   HC.DECOR_SETS = {
     hills:  ['tree', 'tree', 'bush', 'pine', 'rock', 'fence', 'pole', 'grass', 'grass', 'lamp', 'crates'],
-    dunes:  ['bush', 'grass', 'rock', 'cactus', 'cactus', 'grass', 'skull', 'crates', 'lamp'],
-    ridge:  ['pine', 'pine', 'rock', 'rock', 'bush', 'pole', 'grass', 'crates', 'flagpole'],
+    sand:    ['cactus', 'cactus', 'rock', 'grass', 'bush', 'skull', 'crates'],
+    highway: ['lamp', 'pole', 'fence', 'grass', 'bush', 'crates', 'tree'],
+    forest:  ['pine', 'tree', 'bush', 'grass', 'rock', 'pine'],
     moon:   ['rock', 'rock', 'crater', 'flag', 'rock', 'crater'],
     base:   ['tree', 'bush', 'grass', 'rock', 'fence', 'pine']
   };

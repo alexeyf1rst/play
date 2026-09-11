@@ -162,45 +162,53 @@ window.HC = window.HC || {};
       this.refreshPending();
     },
 
-    /* --- Выбор трассы ------------------------------------- */
+    /* --- Карта этапов ------------------------------------- */
     openTracks: function () {
       this.open(function () {
         var s = G.state;
         var ids = Object.keys(HC.TRACKS).sort(function (a, b) { return HC.TRACKS[a].order - HC.TRACKS[b].order; });
-        var html = '<p class="lead">Куда поедем? Заезд заканчивается, когда кончается топливо — или когда сам решишь.</p>';
-        ids.forEach(function (id) {
+        var html = '<p class="lead">Пять этапов. Чтобы открыть следующий, хватит бронзы на текущем.</p>';
+
+        ids.forEach(function (id, n) {
           var t = HC.TRACKS[id];
-          var owned = !!s.tracks[id];
+          var open = HC.trackOpen(s, id);
           var best = s.stats.best[id] || 0;
-          html += '<div class="card' + (owned ? '' : ' locked') + '">' +
-            '<div class="card-main"><h3>' + ic(owned ? 'road' : 'lock') + t.name + '</h3><p>' + t.about + '</p>' +
-            '<p class="muted">награда ×' + t.payout.toFixed(2) +
-            (best ? ' · ' + ic('trophy', 'sm') + ' рекорд ' + best + ' м' : '') + '</p></div>' +
-            '<div class="card-side">' +
-            (owned
-              ? '<button class="btn main" data-go="' + id + '">Поехать</button>'
-              : '<button class="btn" data-buy-track="' + id + '" ' + (can(t.price, t.priceOre) ? '' : 'disabled') + '>Открыть</button>' + priceTag(t.price, t.priceOre)) +
+          var medal = HC.medalFor(id, best);
+          var next = t.goals.find(function (gg) { return best < gg; });
+          var pct = next ? Math.min(100, Math.round(best / next * 100)) : 100;
+
+          html += '<div class="stage' + (open ? '' : ' locked') + (medal >= 0 ? ' won' : '') + '">' +
+            '<div class="stage-no">' + (n + 1) + '</div>' +
+            '<div class="stage-main">' +
+              '<h3>' + t.name +
+                (medal >= 0 ? '<span class="medal m' + medal + '">' + ic('medal', 'sm') + HC.MEDALS[medal].name + '</span>' : '') +
+              '</h3>' +
+              '<p>' + t.about + '</p>' +
+              '<div class="goals">';
+          t.goals.forEach(function (gg, i) {
+            var done = best >= gg;
+            html += '<span class="goal' + (done ? ' done' : '') + '">' +
+                    ic(done ? 'medal' : 'flag', 'sm') + HC.fmt(gg) + ' м</span>';
+          });
+          html += '</div>' +
+              '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+              '<p class="muted">' + (best ? 'лучший результат ' + HC.fmt(best) + ' м' : 'ещё не ездил') +
+              ' · награда ×' + t.payout.toFixed(2) + '</p>' +
+            '</div>' +
+            '<div class="stage-side">' +
+              (open ? '<button class="btn main" data-go="' + id + '">Поехать</button>'
+                    : '<span class="done">' + ic('lock', 'sm') + ' нужна бронза<br>на «' + HC.TRACKS[t.unlock].name + '»</span>') +
             '</div></div>';
         });
+
         return {
-          title: 'Маршруты', html: html,
+          title: 'Этапы', html: html,
           bind: function (root) {
             root.querySelectorAll('[data-go]').forEach(function (b) {
               b.addEventListener('click', function () {
                 HC.Audio.click();
                 UI.close();
                 G.startRide(b.getAttribute('data-go'));
-              });
-            });
-            root.querySelectorAll('[data-buy-track]').forEach(function (b) {
-              b.addEventListener('click', function () {
-                var id = b.getAttribute('data-buy-track'), t = HC.TRACKS[id];
-                if (!pay(t.price, t.priceOre)) return;
-                G.state.tracks[id] = true;
-                HC.Audio.build();
-                UI.toast('Открыт маршрут: ' + t.name);
-                HC.save(G.state, true);
-                UI.refresh();
               });
             });
           }
@@ -453,6 +461,15 @@ window.HC = window.HC || {};
       });
     },
 
+    /* Какой этап открылся после медали на этом */
+    unlockedBy: function (trackId) {
+      var next = null;
+      Object.keys(HC.TRACKS).forEach(function (id) {
+        if (HC.TRACKS[id].unlock === trackId) next = HC.TRACKS[id].name;
+      });
+      return next;
+    },
+
     tuneLabel: function (k, v) {
       if (k === 'balance') {
         if (Math.abs(v) < 0.05) return 'нейтрально';
@@ -476,6 +493,10 @@ window.HC = window.HC || {};
     showResults: function (r) {
       this.open(function () {
         var html = '<p class="lead">' + r.reason + (r.record ? ' · новый рекорд!' : '') + '</p>' +
+          (r.newMedal >= 0
+            ? '<div class="medal-won">' + ic('medal', 'lg') + '<b>' + HC.MEDALS[r.newMedal].name + ' на «' +
+              HC.TRACKS[r.track].name + '»</b>' + (UI.unlockedBy(r.track) ? '<em>открыт этап «' + UI.unlockedBy(r.track) + '»</em>' : '') + '</div>'
+            : '') +
           '<div class="result"><div class="big">' + r.distance + ' <small>м</small></div>' +
           '<div class="muted">лучший результат ' + r.best + ' м · ' + HC.fmtTime(r.time) + '</div></div>' +
           '<div class="stat"><span>' + ic('coin', 'sm') + 'монеты на трассе</span><b>' + money(r.coinsRaw) + '</b></div>' +
@@ -710,9 +731,14 @@ window.HC = window.HC || {};
                     if (!s.up[i]) { s.up[i] = {}; for (var u2 in HC.UPGRADES) s.up[i][u2] = 0; }
                     if (!s.tune[i]) s.tune[i] = HC.defaultTune(i);
                   }
-                  for (i in HC.TRACKS) s.tracks[i] = true;
+                  // этапы открываются медалями, поэтому проставляем бронзу
+                  for (i in HC.TRACKS) {
+                    s.tracks[i] = true;
+                    var g0 = HC.TRACKS[i].goals[0];
+                    if ((s.stats.best[i] || 0) < g0) s.stats.best[i] = g0;
+                  }
                   s.base.unlocked = HC.PLOTS.spots.length;
-                  afterCheat('Открыты все машины, маршруты и участки');
+                  afterCheat('Открыты все машины, этапы и участки');
                 }
                 else if (what === 'maxup') {
                   var v = s.vehicle;

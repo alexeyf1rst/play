@@ -241,7 +241,7 @@ window.HC = window.HC || {};
     },
 
     startRide: function (trackId) {
-      if (!this.state.tracks[trackId]) return;
+      if (!HC.trackOpen(this.state, trackId)) return;
       var self = this;
       if (this.scene === 'base') {
         this.fadeTo(function () { self.beginRide(trackId); });

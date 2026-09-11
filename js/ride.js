@@ -41,9 +41,11 @@ window.HC = window.HC || {};
       this.demo = !!demo;
       this.input = { throttle: 0 };
       this.rideMul = 1 + HC.Economy.workshopRide(st);
+      this.prevX = this.car.pos.x;
+      HC.Audio.engineStart();
     },
 
-    stop: function () { this.active = false; },
+    stop: function () { this.active = false; HC.Audio.engineStop(); },
 
     /* --- Логика ------------------------------------------- */
     update: function (dt, input) {
@@ -87,6 +89,7 @@ window.HC = window.HC || {};
       this._lastAir = car.airTime;
 
       if (!car.onGround && this.phase === 'run') this.airTotal += dt;
+      this.hitTrees();
       this.collect();
       this.dust(dt);
       this.updateFx(dt);
@@ -97,6 +100,8 @@ window.HC = window.HC || {};
           this.demoWait = (this.demoWait || 0) + dt;
           if (this.demoWait > 1.6) { this.demoWait = 0; this.start(this.game, this.trackId, true); }
         }
+        HC.Audio.engine(car.rpm || 0, Math.abs(thr), car.slipAmount || 0,
+                        Math.min(1, car.speed / 1300));
         this.camFollow(dt);
         return;
       }
@@ -111,6 +116,8 @@ window.HC = window.HC || {};
         if (this.endTimer > (car.crashed ? 1.3 : 2.2) && (slow || this.endTimer > 7)) this.finish();
       }
 
+      HC.Audio.engine(car.rpm || 0, Math.abs(thr), car.slipAmount || 0,
+                      Math.min(1, car.speed / 1300));
       this.camFollow(dt);
     },
 
@@ -146,12 +153,15 @@ window.HC = window.HC || {};
       if (this.phase === 'done') return;
       this.phase = 'done';
       this.active = false;
+      HC.Audio.engineStop();
       var st = this.game.state;
       var dist = Math.max(0, Math.floor(this.car.distance));
       var distCoins = Math.floor(dist / 100 * HC.ECON.distancePer100 * this.track.payout);
       var base = Math.floor(this.coins * this.track.payout);
       var prev = st.stats.best[this.trackId] || 0;
       var record = dist > prev;
+      var medalBefore = HC.medalFor(this.trackId, prev);
+      var medalNow = HC.medalFor(this.trackId, Math.max(prev, dist));
       // запись о рекорде должна существовать всегда, иначе в итогах
       // окажется «лучший результат undefined м»
       st.stats.best[this.trackId] = Math.max(prev, dist);
@@ -190,7 +200,10 @@ window.HC = window.HC || {};
         cans: this.cans,
         air: this.airTotal,
         record: record,
+        medal: medalNow,
+        newMedal: medalNow > medalBefore ? medalNow : -1,
         best: st.stats.best[this.trackId],
+        track: this.trackId,
         time: this.time
       });
     },
@@ -205,6 +218,35 @@ window.HC = window.HC || {};
     addCoins: function (n, x, y, label) {
       this.coins += n;
       this.floats.push({ x: x, y: y, t: 0, text: (label ? label + ' +' : '+') + n });
+    },
+
+    /* Дерево на дороге: снести можно, но машина резко теряет ход. */
+    hitTrees: function () {
+      var T = this.terrain;
+      if (!T.track.trees || this.phase !== 'run') { this.prevX = this.car.pos.x; return; }
+      var car = this.car;
+      var from = Math.min(this.prevX === undefined ? car.pos.x : this.prevX, car.pos.x);
+      var to = Math.max(this.prevX === undefined ? car.pos.x : this.prevX, car.pos.x);
+      var list = T.treesIn(from - 60, to + 60);
+      for (var i = 0; i < list.length; i++) {
+        var tr = list[i];
+        if (tr.broken) continue;
+        if (tr.x < from - 26 || tr.x > to + 26) continue;
+        var top = T.height(tr.x) - 74 * tr.s;
+        if (car.pos.y < top) continue;                  // перелетел поверху
+        if (!T.breakTree(tr.id)) continue;
+        car.vel.x *= 0.62;
+        car.angVel += 0.8 * Math.sign(car.vel.x || 1);
+        HC.Audio.crack();
+        for (var p = 0; p < 7; p++) {
+          this.particles.push({
+            x: tr.x, y: T.height(tr.x) - 40 - Math.random() * 50,
+            vx: (Math.random() - 0.5) * 180, vy: -Math.random() * 120,
+            r: 2 + Math.random() * 4, t: 0, life: 0.6 + Math.random() * 0.5
+          });
+        }
+      }
+      this.prevX = car.pos.x;
     },
 
     collect: function () {
@@ -223,7 +265,9 @@ window.HC = window.HC || {};
         if (d < reach) {
           this.terrain.take(it);
           if (it.type === 'coin') {
-            this.addCoins(HC.ECON.coinPickup, it.x, it.y);
+            // чем дальше уехал, тем дороже монетка
+            var val = HC.ECON.coinPickup + HC.ECON.coinPer100 * Math.floor(car.distance / 100);
+            this.addCoins(val, it.x, it.y);
             HC.Audio.coin();
           } else if (it.type === 'ore') {
             this.ore += HC.ECON.orePickup;
@@ -370,6 +414,25 @@ window.HC = window.HC || {};
     /* Деревья, столбы и камни вдоль дороги */
     drawDecor: function (g, cam, W, H, P) {
       var T = this.terrain;
+
+      // деревья-препятствия: сломанные лежат
+      var trees = T.treesIn(cam.x - W / cam.z * 0.7, cam.x + W / cam.z * 0.7);
+      for (var ti = 0; ti < trees.length; ti++) {
+        var tr = trees[ti];
+        var ty = T.height(tr.x);
+        g.save();
+        g.translate(tr.x, ty);
+        if (tr.broken) {
+          g.rotate(1.35);
+          g.globalAlpha = 0.75;
+        } else {
+          HC.Decor.shadow(g, P, 20 * tr.s, 0.24);
+        }
+        HC.Decor.draw(g, tr.kind, P, tr.s, false);
+        g.restore();
+        g.globalAlpha = 1;
+      }
+
       var list = T.decorIn(cam.x - W / cam.z * 0.7, cam.x + W / cam.z * 0.7);
       for (var i = 0; i < list.length; i++) {
         var d = list[i];

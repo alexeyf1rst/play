@@ -25,7 +25,7 @@ window.HC = window.HC || {};
   HC.VEHICLES = {
     jeep: {
       name: 'Джип', order: 0,
-      about: 'Спокойный универсал. Середина во всём — с него удобно начинать.',
+      about: 'Средний во всём: обычные колёса, обычная скорость. С него начинают.',
       price: 0, priceOre: 0,
       mass: 9, power: 15000, fuel: 100, burn: 2.5, topSpeed: 950, react: 1.00, airCtrl: 1.00,
       drive: 'all',
@@ -35,89 +35,53 @@ window.HC = window.HC || {};
       body:  [ [-48,-8], [-42,-24], [-6,-28], [8,-14], [50,-10], [50,12], [-48,12] ],
       head:  [ -18, -38 ]
     },
-    bike: {
-      name: 'Мотоцикл', order: 1,
-      about: 'Ракета. Разгоняется вдвое резче джипа и крутит сальто там, где другие только подпрыгнут. Сцепления почти нет.',
-      price: 3500, priceOre: 0,
-      mass: 5.2, power: 16000, fuel: 70, burn: 2.1, topSpeed: 1250, react: 0.95, airCtrl: 1.95,
+    scooter: {
+      name: 'Скутер', order: 1,
+      about: 'Маленькие колёса и лёгкая рама. Вертлявый и экономный, но каждая кочка — его враг.',
+      price: 20000, priceOre: 0,
+      mass: 4.6, power: 9000, fuel: 62, burn: 1.7, topSpeed: 820, react: 0.40, airCtrl: 1.85,
       drive: 'rear',
-      wheel: { r: 24, mass: 1.1, grip: 0.82 },
-      susp:  { rest: 30, min: 11, max: 54, sag: 10, damp: 0.58 },
-      axles: [ { x: -32, y: 4 }, { x: 32, y: 4 } ],
-      body:  [ [-36,-6], [-16,-16], [6,-16], [22,-4], [36,-2], [36,8], [-36,8] ],
-      head:  [ -6, -34 ]
+      wheel: { r: 14, mass: 0.8, grip: 0.90 },
+      susp:  { rest: 22, min: 8, max: 38, sag: 7, damp: 0.58 },
+      axles: [ { x: -31, y: 10 }, { x: 31, y: 10 } ],
+      body:  [ [-30,-4], [-24,-18], [-6,-20], [4,-8], [26,-6], [30,2], [30,12], [-30,12] ],
+      head:  [ -8, -34 ]
     },
-    buggy: {
-      name: 'Багги', order: 2,
-      about: 'Открытая рама и длинные рычаги. Быстрый, прыгучий, мягко садится.',
-      price: 9000, priceOre: 0,
-      mass: 6.4, power: 16500, fuel: 85, burn: 2.4, topSpeed: 1200, react: 1.00, airCtrl: 1.45,
+    bolid: {
+      name: 'Болид', order: 2,
+      about: 'Длинный, низкий, очень быстрый. На ровном никто не догонит, на кочках цепляет днищем.',
+      price: 95000, priceOre: 60,
+      mass: 7.5, power: 21000, fuel: 125, burn: 3.1, topSpeed: 1500, react: 0.80, airCtrl: 1.25,
       drive: 'rear',
-      wheel: { r: 23, mass: 1.3, grip: 1.00 },
-      susp:  { rest: 34, min: 12, max: 66, sag: 13, damp: 0.46 },
-      axles: [ { x: -38, y: 2 }, { x: 38, y: 2 } ],
-      body:  [ [-44,-4], [-38,-22], [-14,-30], [2,-14], [30,-12], [44,-4], [44,8], [-44,8] ],
-      head:  [ -16, -40 ]
+      wheel: { r: 16, mass: 1.1, grip: 1.28 },
+      susp:  { rest: 18, min: 7, max: 30, sag: 6, damp: 0.70 },
+      axles: [ { x: -48, y: 8 }, { x: 48, y: 8 } ],
+      body:  [ [-64,0], [-58,-12], [-30,-14], [-14,-24], [6,-24], [16,-12], [64,-8], [66,4], [-64,8] ],
+      head:  [ -4, -32 ]
     },
     truck: {
-      name: 'Грузовик', order: 3,
-      about: 'Разгоняется лениво, зато не опрокидывается и везёт много топлива.',
-      price: 18000, priceOre: 40,
-      mass: 15, power: 19000, fuel: 165, burn: 3.2, topSpeed: 820, react: 0.85, airCtrl: 0.78,
-      drive: 'rear',
-      wheel: { r: 26, mass: 2.6, grip: 1.20 },
-      susp:  { rest: 30, min: 11, max: 48, sag: 8, damp: 0.62 },
-      axles: [ { x: -46, y: 8 }, { x: 46, y: 8 } ],
-      body:  [ [-62,-10], [-56,-34], [-20,-38], [-8,-16], [62,-14], [62,14], [-62,14] ],
-      head:  [ -34, -48 ]
-    },
-    tractor: {
-      name: 'Трактор', order: 4,
-      about: 'Самый медленный и самый цепкий. Вползёт по стене, но сальто не ждите.',
-      price: 34000, priceOre: 90,
-      mass: 13, power: 14000, fuel: 140, burn: 2.8, topSpeed: 660, react: 0.95, airCtrl: 0.85,
-      drive: 'rear',
-      wheel: { r: 34, mass: 2.4, grip: 1.65 },
-      susp:  { rest: 24, min: 9, max: 40, sag: 7, damp: 0.66 },
-      axles: [ { x: -34, y: 2, r: 34 }, { x: 40, y: 12, r: 17, mass: 1.2 } ],
-      body:  [ [-52,-6], [-46,-42], [-14,-46], [-8,-20], [48,-16], [48,10], [-52,10] ],
-      head:  [ -30, -56 ]
-    },
-    monster: {
-      name: 'Монстр-трак', order: 5,
-      about: 'Колёса выше кузова: переезжает кочки, которых другие боятся. Тяжёлый и быстрый.',
-      price: 60000, priceOre: 200,
-      mass: 17, power: 27000, fuel: 180, burn: 3.7, topSpeed: 1000, react: 0.95, airCtrl: 0.92,
+      name: 'Трак', order: 3,
+      about: 'Огромные колёса переезжают то, обо что спотыкаются остальные. Тяжёлый и стойкий.',
+      price: 300000, priceOre: 220,
+      mass: 18, power: 27000, fuel: 190, burn: 3.8, topSpeed: 980, react: 0.90, airCtrl: 0.85,
       drive: 'all',
-      wheel: { r: 35, mass: 3.0, grip: 1.30 },
-      susp:  { rest: 36, min: 13, max: 62, sag: 10, damp: 0.58 },
-      axles: [ { x: -42, y: -2 }, { x: 42, y: -2 } ],
-      body:  [ [-50,-14], [-44,-36], [-6,-40], [8,-20], [52,-16], [52,8], [-50,8] ],
-      head:  [ -24, -50 ]
+      wheel: { r: 36, mass: 3.1, grip: 1.32 },
+      susp:  { rest: 36, min: 13, max: 64, sag: 10, damp: 0.60 },
+      axles: [ { x: -44, y: -2 }, { x: 44, y: -2 } ],
+      body:  [ [-52,-14], [-46,-38], [-6,-42], [8,-20], [54,-16], [54,8], [-52,8] ],
+      head:  [ -24, -52 ]
     },
     rover: {
-      name: 'Луноход', order: 6,
-      about: 'Липкое сцепление и неубиваемая подвеска. Едет там, где не едет никто.',
-      price: 95000, priceOre: 350,
-      mass: 11, power: 17000, fuel: 200, burn: 2.8, topSpeed: 900, react: 1.00, airCtrl: 1.05,
-      drive: 'all',
-      wheel: { r: 33, mass: 2.0, grip: 1.50 },
+      name: 'Луноход', order: 4,
+      about: 'Немного парит: в воздухе тянет вниз слабее, чем остальных. Липкое сцепление, долгие прыжки.',
+      price: 700000, priceOre: 650,
+      mass: 11, power: 17000, fuel: 210, burn: 2.7, topSpeed: 900, react: 1.00, airCtrl: 1.15,
+      drive: 'all', lift: 0.38,
+      wheel: { r: 30, mass: 2.0, grip: 1.45 },
       susp:  { rest: 38, min: 14, max: 64, sag: 12, damp: 0.55 },
       axles: [ { x: -42, y: 2 }, { x: 42, y: 2 } ],
       body:  [ [-50,-6], [-44,-26], [-4,-30], [10,-16], [52,-12], [52,10], [-50,10] ],
       head:  [ -20, -40 ]
-    },
-    crawler: {
-      name: 'Вездеход 6×6', order: 7,
-      about: 'Три оси и полный привод. Самый спокойный способ уехать далеко.',
-      price: 150000, priceOre: 700,
-      mass: 19, power: 24000, fuel: 240, burn: 3.2, topSpeed: 780, react: 0.75, airCtrl: 0.70,
-      drive: 'all',
-      wheel: { r: 22, mass: 1.9, grip: 1.42 },
-      susp:  { rest: 28, min: 10, max: 50, sag: 9, damp: 0.60 },
-      axles: [ { x: -54, y: 8 }, { x: 0, y: 8 }, { x: 54, y: 8 } ],
-      body:  [ [-70,-10], [-64,-32], [-22,-36], [-10,-16], [70,-12], [70,12], [-70,12] ],
-      head:  [ -40, -46 ]
     }
   };
 
@@ -127,31 +91,70 @@ window.HC = window.HC || {};
   */
   HC.TRACKS = {
     hills: {
-      name: 'Холмы', order: 0, price: 0, priceOre: 0,
-      about: 'Мягкие волны. Место, куда возвращаются.',
+      name: 'Холмы', order: 0, unlock: null,
+      about: 'Мягкие волны и трамплины. Место, где учатся.',
       amp: 150, len: 620, rough: 0.45, gravity: 1350,
-      coinRate: 1.00, oreRate: 0.10, payout: 1.00
+      grip: 1.00, roll: 1.00,
+      coinRate: 1.00, oreRate: 0.10, payout: 1.00,
+      goals: [ 500, 1200, 2200 ]
     },
-    dunes: {
-      name: 'Дюны', order: 1, price: 2500, priceOre: 0,
-      about: 'Длинные пологие спуски. Топливо тает медленно.',
-      amp: 120, len: 950, rough: 0.30, gravity: 1330,
-      coinRate: 1.15, oreRate: 0.12, payout: 1.25
+    sand: {
+      name: 'Песочница', order: 1, unlock: 'hills',
+      about: 'Песок вязкий: колёса буксуют, разгон тонет. Зато платят больше.',
+      amp: 130, len: 900, rough: 0.35, gravity: 1330,
+      grip: 0.62, roll: 2.6,
+      coinRate: 1.10, oreRate: 0.14, payout: 1.35,
+      goals: [ 400, 900, 1700 ]
     },
-    ridge: {
-      name: 'Хребет', order: 2, price: 9000, priceOre: 25,
-      about: 'Круто вверх, круто вниз. Требует терпения.',
-      amp: 220, len: 950, rough: 0.70, gravity: 1420,
-      coinRate: 0.95, oreRate: 0.28, payout: 1.75
+    highway: {
+      name: 'Хайвэй', order: 2, unlock: 'sand',
+      about: 'Гладкое покрытие и длинные пологие волны. Здесь решает скорость.',
+      amp: 95, len: 1300, rough: 0.18, gravity: 1330,
+      grip: 1.20, roll: 0.60,
+      coinRate: 1.00, oreRate: 0.08, payout: 1.60,
+      goals: [ 900, 2000, 3600 ]
     },
     moon: {
-      name: 'Луна', order: 3, price: 30000, priceOre: 150,
-      about: 'Гравитация вполсилы. Долгие тихие прыжки.',
-      amp: 200, len: 800, rough: 0.45, gravity: 520,
-      coinRate: 1.05, oreRate: 0.40, payout: 2.40
+      name: 'Луна', order: 3, unlock: 'highway',
+      about: 'Гравитация вполсилы. Прыжки длинные, времени на сальто вагон.',
+      amp: 160, len: 900, rough: 0.40, gravity: 520,
+      grip: 0.90, roll: 0.90,
+      coinRate: 1.05, oreRate: 0.40, payout: 2.10,
+      goals: [ 550, 1300, 2400 ]
+    },
+    forest: {
+      name: 'Лес', order: 4, unlock: 'moon',
+      about: 'Деревья стоят прямо на дороге. Снести можно, но машина теряет ход.',
+      amp: 160, len: 700, rough: 0.50, gravity: 1350,
+      grip: 1.05, roll: 1.10,
+      coinRate: 1.15, oreRate: 0.30, payout: 2.60,
+      goals: [ 550, 1300, 2300 ],
+      trees: true
     }
   };
 
+  /* Медали за расстояние: бронза открывает следующую трассу. */
+  HC.MEDALS = [
+    { key: 'bronze', name: 'Бронза', idx: 0 },
+    { key: 'silver', name: 'Серебро', idx: 1 },
+    { key: 'gold',   name: 'Золото', idx: 2 }
+  ];
+  /* Трасса открыта, если на предыдущей взята хотя бы бронза. */
+  HC.trackOpen = function (state, id) {
+    var t = HC.TRACKS[id];
+    if (!t) return false;
+    if (!t.unlock) return true;
+    var best = (state.stats && state.stats.best && state.stats.best[t.unlock]) || 0;
+    return HC.medalFor(t.unlock, best) >= 0;
+  };
+
+  HC.medalFor = function (trackId, dist) {
+    var t = HC.TRACKS[trackId];
+    if (!t) return -1;
+    var m = -1;
+    for (var i = 0; i < t.goals.length; i++) if (dist >= t.goals[i]) m = i;
+    return m;
+  };
 
   /* --- Тюнинг ---------------------------------------------
      Это не покупается: крути сколько хочешь, бесплатно и в любой момент.
@@ -208,15 +211,15 @@ window.HC = window.HC || {};
      effect  — прибавка за уровень
   */
   HC.UPGRADES = {
-    engine:  { name: 'Двигатель',  max: 15, base: 220,  mult: 1.42, ore: 0,    oreFrom: 8,  oreBase: 6,
+    engine:  { name: 'Двигатель',  max: 15, base: 1000, mult: 1.42, ore: 0,    oreFrom: 8,  oreBase: 6,
                about: 'Тяга. Больше тяги — легче в гору, но легче и на спину.' },
-    tires:   { name: 'Шины',       max: 15, base: 190,  mult: 1.40, ore: 0,    oreFrom: 8,  oreBase: 5,
+    tires:   { name: 'Шины',       max: 15, base: 850,  mult: 1.40, ore: 0,    oreFrom: 8,  oreBase: 5,
                about: 'Сцепление с землёй. Меньше пробуксовки.' },
-    susp:    { name: 'Подвеска',   max: 15, base: 240,  mult: 1.41, ore: 0,    oreFrom: 8,  oreBase: 6,
+    susp:    { name: 'Подвеска',   max: 15, base: 1100, mult: 1.41, ore: 0,    oreFrom: 8,  oreBase: 6,
                about: 'Мягче приземления, реже кувырки.' },
-    fuel:    { name: 'Бак',        max: 15, base: 200,  mult: 1.38, ore: 0,    oreFrom: 9,  oreBase: 5,
+    fuel:    { name: 'Бак',        max: 15, base: 900,  mult: 1.38, ore: 0,    oreFrom: 9,  oreBase: 5,
                about: 'Дольше едешь — дальше уезжаешь.' },
-    magnet:  { name: 'Магнит',     max: 10, base: 600,  mult: 1.55, ore: 0,    oreFrom: 4,  oreBase: 8,
+    magnet:  { name: 'Магнит',     max: 10, base: 2700, mult: 1.55, ore: 0,    oreFrom: 4,  oreBase: 8,
                about: 'Притягивает монеты. Меньше нужно целиться.' }
   };
 
@@ -235,38 +238,38 @@ window.HC = window.HC || {};
   HC.BUILDINGS = {
     mine: {
       name: 'Шахта', icon: 'mine', max: 12,
-      cost: 250, costMult: 1.62, ore: 0, oreMult: 1.5, oreFrom: 6, oreBase: 8,
+      cost: 1100, costMult: 1.62, ore: 0, oreMult: 1.5, oreFrom: 6, oreBase: 8,
       about: 'Тихо стучит внутри холма и приносит монеты.',
-      rate: 20, rateMult: 1.44, res: 'coins'
+      rate: 90, rateMult: 1.44, res: 'coins'
     },
     drill: {
       name: 'Бур', icon: 'drill', max: 12,
-      cost: 1800, costMult: 1.66, ore: 10, oreMult: 1.52, oreFrom: 1, oreBase: 10,
+      cost: 8000, costMult: 1.66, ore: 10, oreMult: 1.52, oreFrom: 1, oreBase: 10,
       about: 'Достаёт руду с глубины. Руда нужна для серьёзных вещей.',
       rate: 0.9, rateMult: 1.40, res: 'ore'
     },
     storage: {
       name: 'Склад', icon: 'storage', max: 12,
-      cost: 400, costMult: 1.58, ore: 0, oreMult: 1.5, oreFrom: 7, oreBase: 6,
+      cost: 1800, costMult: 1.58, ore: 0, oreMult: 1.5, oreFrom: 7, oreBase: 6,
       about: 'Сколько добра накопится, пока тебя нет.',
-      capCoins: 900, capOre: 45, capMult: 1.55
+      capCoins: 4000, capOre: 45, capMult: 1.55
     },
     windmill: {
       name: 'Ветряк', icon: 'windmill', max: 10,
-      cost: 1200, costMult: 1.70, ore: 4, oreMult: 1.55, oreFrom: 3, oreBase: 6,
+      cost: 5400, costMult: 1.70, ore: 4, oreMult: 1.55, oreFrom: 3, oreBase: 6,
       about: 'Крутится медленно. Ускоряет всё вокруг.',
       bonus: 0.10   // +10% ко всей добыче за уровень
     },
     workshop: {
       name: 'Мастерская', icon: 'workshop', max: 10,
-      cost: 1500, costMult: 1.72, ore: 6, oreMult: 1.55, oreFrom: 2, oreBase: 8,
+      cost: 6800, costMult: 1.72, ore: 6, oreMult: 1.55, oreFrom: 2, oreBase: 8,
       about: 'Скидка на прокачку машины и больше монет с заездов.',
       discount: 0.03, // -3% к цене прокачки за уровень
       ridebonus: 0.06 // +6% монет с заезда за уровень
     },
     garden: {
       name: 'Сад', icon: 'garden', max: 8,
-      cost: 900, costMult: 1.66, ore: 0, oreMult: 1.5, oreFrom: 5, oreBase: 5,
+      cost: 4000, costMult: 1.66, ore: 0, oreMult: 1.5, oreFrom: 5, oreBase: 5,
       about: 'Ничего не производит. Просто держит время дольше.',
       offline: 1.5   // +1.5 часа к копилке офлайна за уровень
     }
@@ -275,7 +278,7 @@ window.HC = window.HC || {};
   /* --- Участки под постройки ------------------------------ */
   HC.PLOTS = {
     free: 4,          // открыто с самого начала
-    cost: 800,        // цена следующего участка
+    cost: 3600,       // цена следующего участка
     mult: 1.85,
     // x на виртуальном поле и ярус долины (0 — ближний, 1 — верхняя терраса).
     // Высоту участка считает сцена, чтобы постройки стояли ровно на земле.
@@ -289,10 +292,11 @@ window.HC = window.HC || {};
 
   /* --- Прочая экономика ----------------------------------- */
   HC.ECON = {
-    coinPickup: 7,        // монет за одну монетку на трассе
+    coinPickup: 10,       // монет за монетку у старта
+    coinPer100: 5,        // и ещё столько же за каждые пройденные 100 м
     orePickup: 1,          // руды за один камень
     fuelPickup: 0.38,      // доля бака за канистру
-    distancePer100: 6,     // монет за каждые 100 м
+    distancePer100: 5,     // монет за каждые 100 м
     recordBonus: 0.5,      // доля сверху за новый рекорд
     flipCoins: 110,        // за первое сальто в прыжке; второе дороже вдвое и т.д.
     airBonus: 55,          // за каждую секунду в воздухе, если прыжок был долгий
