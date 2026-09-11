@@ -27,7 +27,8 @@ window.HC = window.HC || {};
       name: 'Джип', order: 0,
       about: 'Спокойный универсал. Ничего лишнего.',
       price: 0, priceOre: 0,
-      mass: 9, power: 15000, fuel: 100, burn: 1.5, topSpeed: 900, react: 1.00,
+      mass: 9, power: 15000, fuel: 100, burn: 2.5, topSpeed: 900, react: 1.00,
+      drive: 'all',
       wheel: { r: 21, mass: 1.5, grip: 1.00 },
       susp:  { rest: 26, min: 9, max: 44, sag: 9, damp: 0.55 },
       axles: [ { x: -35, y: 6 }, { x: 35, y: 6 } ],
@@ -38,34 +39,85 @@ window.HC = window.HC || {};
       name: 'Мотоцикл', order: 1,
       about: 'Лёгкий и вертлявый. Легко встаёт на дыбы.',
       price: 3500, priceOre: 0,
-      mass: 5.2, power: 9800, fuel: 70, burn: 1.15, topSpeed: 1020, react: 1.15,
+      mass: 5.2, power: 9800, fuel: 70, burn: 1.9, topSpeed: 1020, react: 1.15,
+      drive: 'rear',
       wheel: { r: 24, mass: 1.1, grip: 0.92 },
       susp:  { rest: 30, min: 11, max: 54, sag: 11, damp: 0.50 },
       axles: [ { x: -32, y: 4 }, { x: 32, y: 4 } ],
       body:  [ [-36,-6], [-16,-16], [6,-16], [22,-4], [36,-2], [36,8], [-36,8] ],
       head:  [ -6, -34 ]
     },
+    buggy: {
+      name: 'Багги', order: 2,
+      about: 'Открытая рама и длинные рычаги. Прыгает охотно, садится мягко.',
+      price: 9000, priceOre: 0,
+      mass: 6.4, power: 12200, fuel: 85, burn: 2.3, topSpeed: 1080, react: 1.20,
+      drive: 'rear',
+      wheel: { r: 23, mass: 1.3, grip: 1.05 },
+      susp:  { rest: 34, min: 12, max: 66, sag: 13, damp: 0.46 },
+      axles: [ { x: -38, y: 2 }, { x: 38, y: 2 } ],
+      body:  [ [-44,-4], [-38,-22], [-14,-30], [2,-14], [30,-12], [44,-4], [44,8], [-44,8] ],
+      head:  [ -16, -40 ]
+    },
     truck: {
-      name: 'Грузовик', order: 2,
+      name: 'Грузовик', order: 3,
       about: 'Тяжёлый и упрямый. Держит горку и везёт много топлива.',
-      price: 12000, priceOre: 40,
-      mass: 15, power: 27000, fuel: 165, burn: 2.1, topSpeed: 820, react: 0.85,
+      price: 18000, priceOre: 40,
+      mass: 15, power: 27000, fuel: 165, burn: 3.6, topSpeed: 820, react: 0.85,
+      drive: 'rear',
       wheel: { r: 26, mass: 2.6, grip: 1.12 },
       susp:  { rest: 30, min: 11, max: 48, sag: 8, damp: 0.62 },
       axles: [ { x: -46, y: 8 }, { x: 46, y: 8 } ],
       body:  [ [-62,-10], [-56,-34], [-20,-38], [-8,-16], [62,-14], [62,14], [-62,14] ],
       head:  [ -34, -48 ]
     },
+    tractor: {
+      name: 'Трактор', order: 4,
+      about: 'Огромное заднее колесо и вечная первая передача. Вползёт куда угодно.',
+      price: 34000, priceOre: 90,
+      mass: 13, power: 24000, fuel: 140, burn: 3.2, topSpeed: 700, react: 1.10,
+      drive: 'rear',
+      wheel: { r: 34, mass: 2.4, grip: 1.40 },
+      susp:  { rest: 24, min: 9, max: 40, sag: 7, damp: 0.66 },
+      axles: [ { x: -34, y: 2, r: 34 }, { x: 40, y: 12, r: 17, mass: 1.2 } ],
+      body:  [ [-52,-6], [-46,-42], [-14,-46], [-8,-20], [48,-16], [48,10], [-52,10] ],
+      head:  [ -30, -56 ]
+    },
+    monster: {
+      name: 'Монстр-трак', order: 5,
+      about: 'Колёса выше кузова. Переезжает холмы, вместо того чтобы их объезжать.',
+      price: 60000, priceOre: 200,
+      mass: 17, power: 34000, fuel: 180, burn: 4.0, topSpeed: 950, react: 0.95,
+      drive: 'all',
+      wheel: { r: 35, mass: 3.0, grip: 1.22 },
+      susp:  { rest: 36, min: 13, max: 62, sag: 10, damp: 0.58 },
+      axles: [ { x: -42, y: -2 }, { x: 42, y: -2 } ],
+      body:  [ [-50,-14], [-44,-36], [-6,-40], [8,-20], [52,-16], [52,8], [-50,8] ],
+      head:  [ -24, -50 ]
+    },
     rover: {
-      name: 'Луноход', order: 3,
-      about: 'Огромные колёса, липкий ход. Едет там, где не едет никто.',
-      price: 42000, priceOre: 220,
-      mass: 11, power: 20000, fuel: 200, burn: 1.25, topSpeed: 880, react: 1.00,
+      name: 'Луноход', order: 6,
+      about: 'Липкий ход и почти неубиваемая подвеска. Едет там, где не едет никто.',
+      price: 95000, priceOre: 350,
+      mass: 11, power: 20000, fuel: 200, burn: 3.0, topSpeed: 880, react: 1.00,
+      drive: 'all',
       wheel: { r: 33, mass: 2.0, grip: 1.35 },
       susp:  { rest: 38, min: 14, max: 64, sag: 12, damp: 0.55 },
       axles: [ { x: -42, y: 2 }, { x: 42, y: 2 } ],
       body:  [ [-50,-6], [-44,-26], [-4,-30], [10,-16], [52,-12], [52,10], [-50,10] ],
       head:  [ -20, -40 ]
+    },
+    crawler: {
+      name: 'Вездеход 6×6', order: 7,
+      about: 'Три оси и полный привод. Самый спокойный способ уехать далеко.',
+      price: 150000, priceOre: 700,
+      mass: 19, power: 33000, fuel: 240, burn: 3.4, topSpeed: 780, react: 0.75,
+      drive: 'all',
+      wheel: { r: 22, mass: 1.9, grip: 1.30 },
+      susp:  { rest: 28, min: 10, max: 50, sag: 9, damp: 0.60 },
+      axles: [ { x: -54, y: 8 }, { x: 0, y: 8 }, { x: 54, y: 8 } ],
+      body:  [ [-70,-10], [-64,-32], [-22,-36], [-10,-16], [70,-12], [70,12], [-70,12] ],
+      head:  [ -40, -46 ]
     }
   };
 
@@ -100,6 +152,57 @@ window.HC = window.HC || {};
     }
   };
 
+
+  /* --- Тюнинг ---------------------------------------------
+     Это не покупается: крути сколько хочешь, бесплатно и в любой момент.
+     Каждый ползунок — настоящий множитель в физике, а не косметика.
+  */
+  HC.TUNING = {
+    gear: {
+      name: 'Передача', min: 0.70, max: 1.40, def: 1, step: 0.05,
+      low: 'короткая', high: 'длинная',
+      about: 'Короткая — резче со старта и лучше в гору. Длинная — выше скорость на равнине.'
+    },
+    stiff: {
+      name: 'Жёсткость подвески', min: 0.60, max: 1.70, def: 1, step: 0.05,
+      low: 'мягкая', high: 'жёсткая',
+      about: 'Мягкая глотает кочки и мягче садится. Жёсткая точнее держит и меньше раскачивает.'
+    },
+    travel: {
+      name: 'Ход подвески', min: 0.70, max: 1.50, def: 1, step: 0.05,
+      low: 'короткий', high: 'длинный',
+      about: 'Длинный ход прощает жёсткие приземления, но машина становится валкой.'
+    },
+    press: {
+      name: 'Давление в шинах', min: 0.70, max: 1.30, def: 1, step: 0.05,
+      low: '低'.replace('低', 'низкое'), high: 'высокое',
+      about: 'Низкое — больше сцепления, но колёса хуже катятся. Высокое — наоборот.'
+    },
+    balance: {
+      name: 'Развесовка', min: -1, max: 1, def: 0, step: 0.1,
+      low: 'вперёд', high: 'назад',
+      about: 'Назад — легче поднимается в гору и охотнее встаёт на дыбы. Вперёд — устойчивее.'
+    },
+    air: {
+      name: 'Управление в полёте', min: 0.50, max: 1.80, def: 1, step: 0.05,
+      low: 'вялое', high: 'резкое',
+      about: 'Насколько быстро машина крутится в воздухе от газа и тормоза.'
+    }
+  };
+
+  HC.DRIVE = {
+    all:   { name: 'Полный',  about: 'Тяга на все колёса: лучше держит, спокойнее.' },
+    rear:  { name: 'Задний',  about: 'Только задние: охотнее встаёт на дыбы.' },
+    front: { name: 'Передний', about: 'Только передние: тянет машину носом, реже опрокидывает.' }
+  };
+
+  HC.defaultTune = function (vid) {
+    var t = {};
+    for (var k in HC.TUNING) t[k] = HC.TUNING[k].def;
+    t.drive = (HC.VEHICLES[vid] && HC.VEHICLES[vid].drive) || 'all';
+    return t;
+  };
+
   /* --- Гараж: прокачка машины ----------------------------
      cost(l) = base * mult^l  (l — текущий уровень, с нуля)
      effect  — прибавка за уровень
@@ -119,7 +222,7 @@ window.HC = window.HC || {};
 
   // Во что превращается уровень прокачки
   HC.upgradeEffect = {
-    engine: function (l) { return 1 + l * 0.085; },   // множитель тяги
+    engine: function (l) { return 1 + l * 0.055; },   // множитель тяги
     tires:  function (l) { return 1 + l * 0.055; },   // множитель сцепления
     susp:   function (l) { return 1 + l * 0.060; },   // жёсткость/демпфер
     fuel:   function (l) { return 1 + l * 0.110; },   // множитель бака
@@ -186,10 +289,10 @@ window.HC = window.HC || {};
 
   /* --- Прочая экономика ----------------------------------- */
   HC.ECON = {
-    coinPickup: 5,        // монет за одну монетку на трассе
+    coinPickup: 7,        // монет за одну монетку на трассе
     orePickup: 1,          // руды за один камень
-    fuelPickup: 0.32,      // доля бака за канистру
-    distancePer100: 4,     // монет за каждые 100 м
+    fuelPickup: 0.38,      // доля бака за канистру
+    distancePer100: 6,     // монет за каждые 100 м
     recordBonus: 0.5,      // доля сверху за новый рекорд
     offlineHoursBase: 4,   // базовый потолок офлайн-копилки
     startCoins: 0

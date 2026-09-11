@@ -147,6 +147,75 @@ html, body {
 .btn.ghost { background: transparent; }
 .btn.wide { flex: 1; }
 
+/* --- Картинки в списках ---------------------------------- */
+.thumb {
+  width: 112px; height: 80px;
+  flex: none;
+  object-fit: contain;
+  align-self: center;
+}
+.hero {
+  display: flex; gap: 14px; align-items: center;
+  margin: 0 0 16px;
+}
+.hero .thumb, .hero img { width: 180px; height: 132px; flex: none; object-fit: contain; }
+.hero p { margin: 0; color: var(--ink-soft); font-size: 14px; }
+
+/* --- Тюнинг ---------------------------------------------- */
+.tune {
+  padding: 12px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.tune-head { display: flex; justify-content: space-between; align-items: baseline; }
+.tune-head b { font-size: 14px; font-weight: 650; }
+.tune-head em {
+  font-style: normal; font-variant-numeric: tabular-nums;
+  font-size: 13px; color: var(--ink-soft);
+}
+.tune input[type=range] {
+  width: 100%; margin: 9px 0 2px;
+  accent-color: var(--ink);
+}
+.tune-ends {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--ink-soft);
+}
+.tune-ends i { font-style: normal; }
+.tune .muted { margin-top: 6px; }
+
+.seg { display: flex; gap: 0; margin: 9px 0 2px; }
+.seg button {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink-soft);
+  padding: 9px 4px;
+  font: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer;
+}
+.seg button:first-child { border-radius: 10px 0 0 10px; }
+.seg button:last-child { border-radius: 0 10px 10px 0; }
+.seg button + button { border-left: 0; }
+.seg button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+/* --- Задания --------------------------------------------- */
+.quest.claimed .card-main { opacity: .5; }
+.quest.ready .card-main h3::after {
+  content: '✓';
+  margin-left: 7px;
+  color: var(--ink-soft);
+}
+.quest .card-main h3 { display: block; }
+#btn-quests { position: relative; }
+#quest-badge {
+  position: absolute; top: -7px; right: -7px;
+  min-width: 21px; height: 21px; padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ink); color: var(--paper);
+  border: 2px solid var(--panel);
+  font-size: 11px; line-height: 17px; font-weight: 650;
+}
+
 /* --- HUD заезда ------------------------------------------ */
 #ride-top {
   position: fixed; top: 0; left: 0; right: 0;
@@ -319,6 +388,11 @@ textarea#code-box {
   .pedal { width: 76px; height: 76px; }
   .card { gap: 10px; }
   .btn { padding: 11px 15px; }
+  #base-bar { gap: 7px; padding-left: 10px; padding-right: 10px; }
+  #base-bar .btn { padding: 11px 9px; font-size: 14px; flex: 1; }
+  .thumb { width: 84px; height: 62px; }
+  .hero { gap: 10px; }
+  .hero .thumb, .hero img { width: 132px; height: 96px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }

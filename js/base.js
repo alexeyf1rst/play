@@ -110,12 +110,13 @@ window.HC = window.HC || {};
     },
 
     layout: function (W, H) {
-      this.scale = clamp(Math.min(H / VH, W / 620), 0.25, 2.4);
+      this.scale = clamp(Math.min(H / VH, W / 680), 0.25, 2.4);
       var vw = W / this.scale;
       if (vw >= VW) { this.pan = (VW - vw) / 2; this.padX = 0; }
       else this.pan = clamp(this.pan, 0, VW - vw);
       this.padX = 0;
-      this.padY = Math.max(0, (H - VH * this.scale) / 2);
+      // прижимаем долину к низу, лишнее место отдаём небу
+      this.padY = Math.max(0, (H - VH * this.scale) * 0.80);
     },
 
     toVirtual: function (sx, sy) {
@@ -143,6 +144,7 @@ window.HC = window.HC || {};
       grad.addColorStop(0, P.sky0); grad.addColorStop(1, P.sky1);
       g.fillStyle = grad;
       g.fillRect(0, 0, W, H);
+      HC.drawClouds(g, W, H, P, this.pan * this.scale, this.padY + 300 * this.scale, this.t);
 
       g.save();
       g.translate(this.padX, this.padY);
@@ -198,11 +200,11 @@ window.HC = window.HC || {};
       g.save();
       g.fillStyle = P.ground;
       g.beginPath();
-      g.moveTo(x0, VH + 60);
+      g.moveTo(x0, VH + 900);
       if (rounded) g.lineTo(x0 + 26, fn(x0 + 26) + 10);
       for (x = x0; x <= x1; x += 14) g.lineTo(x, fn(x));
       if (rounded) g.lineTo(x1 - 26, fn(x1 - 26) + 10);
-      g.lineTo(x1, VH + 60);
+      g.lineTo(x1, VH + 900);
       g.closePath();
       g.fill();
 
@@ -265,6 +267,39 @@ window.HC = window.HC || {};
       g.setLineDash([]);
       g.restore();
       g.globalAlpha = 1;
+    },
+
+    /* Картинка постройки для списков в интерфейсе.
+       Рисуется тем же кодом, что и на базе, поэтому в магазине
+       видно ровно то, что появится в долине. */
+    thumb: function (type, P, W, H) {
+      this._thumbs = this._thumbs || {};
+      var key = type + '|' + W + '|' + P.ink;
+      if (this._thumbs[key]) return this._thumbs[key];
+
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var c = document.createElement('canvas');
+      c.width = W * dpr; c.height = H * dpr;
+      var g = c.getContext('2d');
+      g.scale(dpr, dpr);
+
+      // общая рамка и общая линия земли — постройки в списке стоят рядом,
+      // как стояли бы в долине, и видно, кто выше
+      var box = { x0: -74, x1: 74, y0: -92, y1: 12 };
+      var s = Math.min(W / (box.x1 - box.x0), H / (box.y1 - box.y0));
+      g.translate(W / 2, H - 2);
+      g.scale(s, s);
+      g.translate(-(box.x0 + box.x1) / 2, -box.y1);
+
+      g.strokeStyle = P.ink;
+      g.fillStyle = P.bodyFill;
+      g.lineWidth = 2.4;
+      g.lineJoin = 'round';
+      var fn = this.shapes[type];
+      if (fn) fn.call(this, g, P, 1, 0.75);
+
+      this._thumbs[key] = c.toDataURL('image/png');
+      return this._thumbs[key];
     },
 
     /* --- Постройки ---------------------------------------- */

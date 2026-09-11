@@ -12,10 +12,19 @@ window.HC = window.HC || {};
   var REF_G = 1750;    // гравитация, под которую считаем пружины
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
-  function Vehicle(id, up, terrain, gravity) {
+  function Vehicle(id, up, terrain, gravity, tune) {
     var def = HC.VEHICLES[id];
     var E = HC.upgradeEffect;
     up = up || {};
+    tune = tune || HC.defaultTune(id);
+    var T = HC.TUNING;
+    function knob(k) {
+      var val = typeof tune[k] === 'number' ? tune[k] : T[k].def;
+      return Math.max(T[k].min, Math.min(T[k].max, val));
+    }
+    var gear = knob('gear'), stiff = knob('stiff'), travel = knob('travel');
+    var press = knob('press'), bal = knob('balance'), airk = knob('air');
+    this.tune = tune;
 
     this.id = id;
     this.def = def;
@@ -23,11 +32,15 @@ window.HC = window.HC || {};
     this.gravity = gravity;
 
     var lu = { engine: up.engine | 0, tires: up.tires | 0, susp: up.susp | 0, fuel: up.fuel | 0, magnet: up.magnet | 0 };
-    this.power = def.power * E.engine(lu.engine);
-    this.grip = def.wheel.grip * E.tires(lu.tires);
+    // короткая передача даёт тягу, длинная — скорость
+    this.power = def.power * E.engine(lu.engine) / Math.sqrt(gear);
+    this.topSpeed = def.topSpeed * (1 + lu.engine * 0.018) * Math.pow(gear, 0.6);
+    // низкое давление — цепче, но хуже катится
+    this.grip = def.wheel.grip * E.tires(lu.tires) * (1.30 - 0.30 * press);
+    this.rollFree = 0.5 * (1.70 - 0.70 * press);
+    this.airK = HC.WORLD.airControl * airk;
     this.maxFuel = def.fuel * E.fuel(lu.fuel);
     this.magnet = E.magnet(lu.magnet);
-    this.topSpeed = def.topSpeed * (1 + lu.engine * 0.012);
 
     // масса и момент инерции кузова
     var bb = { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 };
@@ -41,25 +54,42 @@ window.HC = window.HC || {};
 
     // подвеска: считаем жёсткость из массы и желаемой просадки
     var total = def.mass + def.wheel.mass * def.axles.length;
-    var suspMul = 1 + lu.susp * 0.02;
-    this.suspRest = def.susp.rest;
+    var suspMul = (1 + lu.susp * 0.02) * stiff;
+    this.suspRest = def.susp.rest * (0.85 + 0.15 * travel);
     this.suspMin = def.susp.min;
-    this.suspMax = def.susp.max * (1 + lu.susp * 0.03);
+    this.suspMax = def.susp.max * (1 + lu.susp * 0.03) * travel;
     this.suspK = (total * REF_G / def.axles.length) / def.susp.sag * suspMul;
-    this.suspC = 2 * Math.sqrt(this.suspK * (total / def.axles.length)) * def.susp.damp * (1 + lu.susp * 0.05);
+    this.suspC = 2 * Math.sqrt(this.suspK * (total / def.axles.length)) * def.susp.damp *
+                 (1 + lu.susp * 0.05) * Math.sqrt(stiff);
 
-    // колёса
+    // колёса. Радиус и масса берутся с оси, если она их задаёт —
+    // так у трактора заднее колесо больше переднего.
     this.wheels = def.axles.map(function (a) {
-      var r = def.wheel.r;
+      var r = a.r || def.wheel.r;
+      var m = a.mass || def.wheel.mass;
       return {
-        lx: a.x, ly: a.y, r: r,
-        mass: def.wheel.mass,
-        I: 0.5 * def.wheel.mass * r * r,
+        lx: a.x + bal * 9, ly: a.y, r: r,       // развесовка сдвигает колёса относительно центра масс
+        mass: m,
+        I: 0.5 * m * r * r,
         pos: { x: 0, y: 0 }, vel: { x: 0, y: 0 },
         spin: 0, spinAngle: 0,
-        contact: false, load: 0
+        contact: false, load: 0, drive: true
       };
     });
+
+    // какие колёса ведущие
+    var mode = tune.drive || def.drive || 'all';
+    if (!HC.DRIVE[mode]) mode = 'all';
+    this.driveMode = mode;
+    var xs = this.wheels.map(function (w) { return w.lx; });
+    var rear = Math.min.apply(null, xs), front = Math.max.apply(null, xs);
+    this.wheels.forEach(function (w) {
+      w.drive = mode === 'all' ? true
+              : mode === 'rear' ? w.lx < rear + 1
+              : w.lx > front - 1;
+    });
+    this.driven = this.wheels.filter(function (w) { return w.drive; });
+    if (!this.driven.length) { this.wheels[0].drive = true; this.driven = [this.wheels[0]]; }
 
     // точки кузова, которыми он цепляет землю
     this.hull = [];
@@ -123,9 +153,9 @@ window.HC = window.HC || {};
     /* 1. Двигатель: момент на колёса и отдача на кузов */
     if (throttle !== 0) {
       var force = this.power * throttle;
-      var n = this.wheels.length;
+      var n = this.driven.length;
       for (i = 0; i < n; i++) {
-        w = this.wheels[i];
+        w = this.driven[i];
         var v = w.spin * w.r;
         // не разгоняем колесо выше предельной скорости
         if (!(throttle > 0 && v > this.topSpeed) && !(throttle < 0 && v < -this.topSpeed * 0.55)) {
@@ -248,7 +278,7 @@ window.HC = window.HC || {};
     /* 6. Управление в полёте */
     this.onGround = anyContact;
     if (!anyContact && throttle !== 0) {
-      this.angVel -= throttle * HC.WORLD.airControl * h;
+      this.angVel -= throttle * this.airK * h;
       this.angVel = clamp(this.angVel, -4.0, 4.0);
     }
 
@@ -257,7 +287,7 @@ window.HC = window.HC || {};
     this.vel.x *= drag; this.vel.y *= drag;
     this.angVel *= 1 - 0.9 * h;
     for (i = 0; i < this.wheels.length; i++) {
-      this.wheels[i].spin *= 1 - (throttle === 0 ? 0.5 : 0.06) * h;
+      this.wheels[i].spin *= 1 - (throttle === 0 ? this.rollFree : 0.06) * h;
     }
 
     /* 8. Интегрируем */
@@ -391,6 +421,34 @@ window.HC = window.HC || {};
     g.stroke();
 
     g.restore();
+  };
+
+  /* Рисуем машину в покое, без физики — для картинок в магазине.
+     Рамка у всех машин общая, поэтому в списке сразу видно,
+     что монстр-трак крупнее мотоцикла. */
+  HC.vehicleSprite = function (def, P, W, H) {
+    var rest = def.susp.rest;
+    var box = { x0: -80, x1: 80, y0: -60, y1: 72 };
+
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var c = document.createElement('canvas');
+    c.width = W * dpr; c.height = H * dpr;
+    var g = c.getContext('2d');
+    g.scale(dpr, dpr);
+
+    var s = Math.min(W / (box.x1 - box.x0), H / (box.y1 - box.y0));
+    g.translate(W / 2, H - 2);
+    g.scale(s, s);
+    g.translate(-(box.x0 + box.x1) / 2, -box.y1);
+
+    var fake = {
+      def: def, ang: 0, pos: { x: 0, y: 0 },
+      wheels: def.axles.map(function (a) {
+        return { pos: { x: a.x, y: a.y + rest }, r: a.r || def.wheel.r, spinAngle: 0.4 };
+      })
+    };
+    Vehicle.prototype.draw.call(fake, g, P);
+    return c.toDataURL('image/png');
   };
 
   HC.Vehicle = Vehicle;

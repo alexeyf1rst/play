@@ -40,6 +40,8 @@ window.HC = window.HC || {};
       this.resize();
       window.addEventListener('resize', this.resize.bind(this));
 
+      HC.Quests.ensure(this.state);
+
       // что накопилось, пока игра была закрыта
       var off = HC.Economy.applyOffline(this.state);
       HC.UI.refreshTop();
@@ -51,7 +53,12 @@ window.HC = window.HC || {};
       requestAnimationFrame(this.frame.bind(this));
 
       var self = this;
-      setInterval(function () { HC.save(self.state); }, 10000);
+      setInterval(function () {
+        // новый день/неделя/месяц могут наступить прямо во время игры
+        if (HC.Quests.ensure(self.state).length) HC.UI.toast('Появились новые задания');
+        HC.UI.refreshQuestBadge();
+        HC.save(self.state);
+      }, 10000);
       window.addEventListener('beforeunload', function () { HC.save(self.state, true); });
       document.addEventListener('visibilitychange', function () {
         if (document.hidden) { HC.save(self.state, true); HC.Audio.suspend(); }
@@ -70,6 +77,7 @@ window.HC = window.HC || {};
       var dark = this.state.settings.theme === 'dark';
       document.body.classList.toggle('theme-dark', dark);
       this.P = PALETTES[dark ? 'dark' : 'paper'];
+      HC.Base._thumbs = {};      // картинки перерисуются под новую тему
       var meta = document.querySelector('meta[name="theme-color"]');
       if (meta) meta.setAttribute('content', dark ? '#0f1012' : '#f4f2ee');
     },

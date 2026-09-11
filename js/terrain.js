@@ -32,13 +32,24 @@ window.HC = window.HC || {};
     this.taken = {};       // что уже подобрано в этом заезде
   }
 
+  /* Чем дальше уехал, тем крупнее холмы и злее кочки.
+     Отсюда у заезда появляется естественный конец: рано или поздно
+     рельеф станет сложнее, чем твоя машина. */
+  Terrain.prototype.hard = function (x) {
+    var k = clamp((x - 7000) / 58000, 0, 1);
+    return k * k * (3 - 2 * k);
+  };
+
   /* Сумма октав шума — "сырая" форма холмов. */
   Terrain.prototype.raw = function (x) {
     var t = this.track, s = this.seed, L = t.len;
-    var h = vnoise(x / L, s) * t.amp;
-    h += vnoise(x / (L * 0.43) + 17.3, s + 101) * t.amp * 0.45 * t.rough;
-    h += vnoise(x / (L * 0.19) + 51.7, s + 202) * t.amp * 0.18 * t.rough;
-    h += vnoise(x / (L * 3.10) + 7.10, s + 303) * t.amp * 1.10;   // длинная пологая волна
+    var k = this.hard(x);
+    var amp = t.amp * (1 + k * 0.38);
+    var rough = t.rough * (1 + k * 0.55);
+    var h = vnoise(x / L, s) * amp;
+    h += vnoise(x / (L * 0.43) + 17.3, s + 101) * amp * 0.45 * rough;
+    h += vnoise(x / (L * 0.19) + 51.7, s + 202) * amp * 0.18 * rough;
+    h += vnoise(x / (L * 3.10) + 7.10, s + 303) * amp * 1.10;   // длинная пологая волна
     return h;
   };
 
@@ -71,7 +82,7 @@ window.HC = window.HC || {};
       var t = this.track;
       var r1 = hash(k, this.seed + 7), r2 = hash(k, this.seed + 8), r3 = hash(k, this.seed + 9);
 
-      if (r1 < 0.06 * t.coinRate) {
+      if (r1 < 0.075 * t.coinRate) {
         var n = 2 + Math.floor(hash(k, this.seed + 11) * 3);
         var arc = hash(k, this.seed + 12) < 0.4;
         for (var i = 0; i < n; i++) {
@@ -80,7 +91,7 @@ window.HC = window.HC || {};
           list.push({ id: k + ':c' + i, type: 'coin', x: cx, y: this.height(cx) - 40 - lift });
         }
       }
-      if (r2 < 0.005) {
+      if (r2 < 0.024) {
         var fx = x0 + 60;
         list.push({ id: k + ':f', type: 'fuel', x: fx, y: this.height(fx) - 34 });
       }
@@ -186,6 +197,32 @@ window.HC = window.HC || {};
     g.moveTo(pts[0].sx, pts[0].sy);
     for (var j = 1; j < pts.length; j++) g.lineTo(pts[j].sx, pts[j].sy);
     g.stroke();
+  };
+
+  /* Облака. Рисуются в координатах экрана, поэтому заполняют небо
+     при любом соотношении сторон — и на широком мониторе, и на телефоне. */
+  function cloud(g, x, y, s) {
+    g.beginPath();
+    g.arc(x, y, 26 * s, Math.PI, 0);
+    g.arc(x + 30 * s, y - 9 * s, 20 * s, Math.PI, 0);
+    g.arc(x + 58 * s, y, 22 * s, Math.PI, 0);
+    g.lineTo(x - 26 * s, y);
+    g.closePath();
+    g.fill();
+  }
+
+  HC.drawClouds = function (g, W, H, P, offset, horizon, time) {
+    g.save();
+    g.fillStyle = P.far0;
+    g.globalAlpha = 0.5;
+    var span = W + 700;
+    for (var i = 0; i < 6; i++) {
+      var drift = offset * (0.10 + (i % 3) * 0.05) + (time || 0) * (3 + (i % 4) * 2);
+      var x = (((i * 421 - drift) % span) + span) % span - 350;
+      var y = horizon * (0.10 + 0.62 * ((i * 3) % 5) / 5);
+      cloud(g, x, y, 0.75 + ((i * 5) % 7) / 7 * 0.85);
+    }
+    g.restore();
   };
 
   HC.Terrain = Terrain;

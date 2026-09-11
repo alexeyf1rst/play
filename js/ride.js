@@ -19,11 +19,13 @@ window.HC = window.HC || {};
       this.trackId = trackId;
       this.track = track;
       this.terrain = new HC.Terrain(track, (Math.random() * 1e9) | 0);
-      this.car = new HC.Vehicle(st.vehicle, st.up[st.vehicle], this.terrain, track.gravity);
+      this.car = new HC.Vehicle(st.vehicle, st.up[st.vehicle], this.terrain, track.gravity, st.tune[st.vehicle]);
       this.cam = { x: this.car.pos.x, y: this.car.pos.y, z: 1 };
       this.coins = 0;
       this.ore = 0;
       this.flips = 0;
+      this.cans = 0;
+      this.airTotal = 0;
       this.airBonus = 0;
       this.time = 0;
       this.phase = 'run';
@@ -61,6 +63,7 @@ window.HC = window.HC || {};
       }
       this._lastAir = car.airTime;
 
+      if (!car.onGround && this.phase === 'run') this.airTotal += dt;
       this.collect();
       this.dust(dt);
       this.updateFx(dt);
@@ -105,6 +108,19 @@ window.HC = window.HC || {};
       var total = Math.floor((base + distCoins + bonus) * this.rideMul);
 
       if (record) st.stats.best[this.trackId] = dist;
+
+      var Q = HC.Quests;
+      Q.report(st, 'dist_run', dist);
+      Q.report(st, 'dist_total', dist);
+      Q.report(st, 'track_dist', dist, this.trackId);
+      Q.report(st, 'coins_run', this.coins);
+      Q.report(st, 'coins_earn', total);
+      Q.report(st, 'flips', this.flips);
+      Q.report(st, 'air', Math.floor(this.airTotal));
+      Q.report(st, 'ore', this.ore);
+      Q.report(st, 'cans', this.cans);
+      Q.report(st, 'runs', 1);
+
       st.coins += total;
       st.ore += this.ore;
       st.stats.runs++;
@@ -122,6 +138,8 @@ window.HC = window.HC || {};
         total: total,
         ore: this.ore,
         flips: this.flips,
+        cans: this.cans,
+        air: this.airTotal,
         record: record,
         best: st.stats.best[this.trackId],
         time: this.time
@@ -164,6 +182,7 @@ window.HC = window.HC || {};
             HC.Audio.ore();
           } else if (it.type === 'fuel') {
             car.fuel = Math.min(car.maxFuel, car.fuel + car.maxFuel * HC.ECON.fuelPickup);
+            this.cans++;
             this.floats.push({ x: it.x, y: it.y, t: 0, text: 'топливо' });
             HC.Audio.fuel();
           }
@@ -214,8 +233,10 @@ window.HC = window.HC || {};
       cam.z = clamp(Math.min(W / 700, H / 760), 0.50, 1.35);
 
       T.drawSky(g, W, H, P);
+      HC.drawClouds(g, W, H, P, cam.x * 0.12, H * 0.62, this.time * 0.6);
       T.drawParallax(g, cam, W, H, P);
       T.drawGround(g, cam, W, H, P, this.game.quality);
+      this.drawMarkers(g, W, H, P);
 
       g.save();
       g.translate(W / 2, H / 2);
@@ -248,9 +269,6 @@ window.HC = window.HC || {};
       }
       g.globalAlpha = 1;
       g.restore();
-
-      // отметка пройденного расстояния на земле — верстовые столбы
-      this.drawMarkers(g, W, H, P);
     },
 
     drawMarkers: function (g, W, H, P) {

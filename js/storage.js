@@ -35,6 +35,8 @@ window.HC = window.HC || {};
       tracks: { hills: true },
       track: 'hills',
       up: { jeep: defaultUpgrades() },
+      tune: { jeep: HC.defaultTune('jeep') },
+      quests: {},
       base: {
         plots: plots,
         unlocked: HC.PLOTS.free,
@@ -78,14 +80,26 @@ window.HC = window.HC || {};
     if (!HC.VEHICLES[s.vehicle] || !s.owned[s.vehicle]) s.vehicle = 'jeep';
     if (!HC.TRACKS[s.track] || !s.tracks[s.track]) s.track = 'hills';
 
-    // прокачка — своя на каждую машину
+    // прокачка и тюнинг — свои на каждую машину
     s.up = s.up || {};
+    s.tune = s.tune || {};
     for (var v in HC.VEHICLES) {
       s.up[v] = s.up[v] || defaultUpgrades();
       for (var u in HC.UPGRADES) {
         s.up[v][u] = Math.max(0, Math.min(HC.UPGRADES[u].max, num(s.up[v][u], 0)));
       }
+      var def = HC.defaultTune(v);
+      var t = s.tune[v] || {};
+      s.tune[v] = {};
+      for (var kn in HC.TUNING) {
+        var K = HC.TUNING[kn];
+        s.tune[v][kn] = Math.max(K.min, Math.min(K.max, num(t[kn], K.def)));
+      }
+      s.tune[v].drive = HC.DRIVE[t.drive] ? t.drive : def.drive;
     }
+
+    // задания: списки пересобираются сами при смене дня/недели/месяца
+    if (!s.quests || typeof s.quests !== 'object') s.quests = {};
 
     // база
     s.base = s.base || d.base;
