@@ -580,6 +580,26 @@ window.HC = window.HC || {};
           '<div class="stat"><span>всего метров</span><b>' + money(st.totalDistance) + '</b></div>' +
           '<div class="stat"><span>всего монет заработано</span><b>' + money(st.totalCoins) + '</b></div>' +
 
+          '<h4 class="sec">Песочница <em>для проверки</em></h4>' +
+          '<p class="muted">Выдать себе ресурсы и всё открыть, чтобы посмотреть игру целиком. ' +
+          'Игра только твоя и офлайновая, так что портить тут нечего — но если хочешь честный ' +
+          'прогресс, сначала сохранись в файл.</p>' +
+          '<div class="row give">' +
+          '<input type="number" id="give-coins" placeholder="монет" min="0" step="1000">' +
+          '<input type="number" id="give-ore" placeholder="руды" min="0" step="100">' +
+          '<button class="btn" id="give-go">Выдать</button></div>' +
+          '<div class="row wrap">' +
+          '<button class="btn" data-cheat="rich">+100 000 монет</button>' +
+          '<button class="btn" data-cheat="ore">+2 000 руды</button>' +
+          '<button class="btn" data-cheat="hour">+1 час добычи</button>' +
+          '</div>' +
+          '<div class="row wrap">' +
+          '<button class="btn" data-cheat="unlock">Открыть всё</button>' +
+          '<button class="btn" data-cheat="maxup">Прокачать машину</button>' +
+          '<button class="btn" data-cheat="quests">Закрыть задания</button>' +
+          '<button class="btn ghost" data-cheat="poor">Обнулить ресурсы</button>' +
+          '</div>' +
+
           '<h4 class="sec">Сохранение</h4>' +
           '<p class="muted">Игра сама пишется в память браузера каждые несколько секунд. ' +
           (HC.isMemoryOnly() ? '<b>Сейчас автосохранение недоступно</b> — браузер запретил запись. Сохраняйся в файл.' :
@@ -617,6 +637,60 @@ window.HC = window.HC || {};
             });
             root.querySelector('#set-calm').addEventListener('change', function (e) {
               G.state.settings.calmMode = e.target.checked; HC.save(G.state, true);
+            });
+
+            function afterCheat(msg) {
+              HC.Audio.build();
+              UI.toast(msg);
+              HC.save(G.state, true);
+              UI.refresh();
+              UI.refreshPending();
+            }
+            root.querySelector('#give-go').addEventListener('click', function () {
+              var c = parseInt(root.querySelector('#give-coins').value, 10) || 0;
+              var o = parseInt(root.querySelector('#give-ore').value, 10) || 0;
+              if (!c && !o) { UI.toast('Впиши сколько выдать'); return; }
+              G.state.coins += Math.max(0, c);
+              G.state.ore += Math.max(0, o);
+              afterCheat('Выдано ' + money(c) + ' монет' + (o ? ' и ' + money(o) + ' руды' : ''));
+            });
+            root.querySelectorAll('[data-cheat]').forEach(function (b) {
+              b.addEventListener('click', function () {
+                var what = b.getAttribute('data-cheat'), s = G.state, i;
+                if (what === 'rich') { s.coins += 100000; afterCheat('+100 000 монет'); }
+                else if (what === 'ore') { s.ore += 2000; afterCheat('+2 000 руды'); }
+                else if (what === 'hour') {
+                  var got = HC.Economy.accrue(s, 3600);
+                  afterCheat('Шахты поработали час: +' + money(Math.floor(got.coins)) + ' в копилку');
+                }
+                else if (what === 'unlock') {
+                  for (i in HC.VEHICLES) {
+                    s.owned[i] = true;
+                    if (!s.up[i]) { s.up[i] = {}; for (var u2 in HC.UPGRADES) s.up[i][u2] = 0; }
+                    if (!s.tune[i]) s.tune[i] = HC.defaultTune(i);
+                  }
+                  for (i in HC.TRACKS) s.tracks[i] = true;
+                  s.base.unlocked = HC.PLOTS.spots.length;
+                  afterCheat('Открыты все машины, маршруты и участки');
+                }
+                else if (what === 'maxup') {
+                  var v = s.vehicle;
+                  for (i in HC.UPGRADES) s.up[v][i] = HC.UPGRADES[i].max;
+                  afterCheat(HC.VEHICLES[v].name + ': прокачка в максимум');
+                }
+                else if (what === 'quests') {
+                  HC.Quests.ensure(s);
+                  for (var p in s.quests) {
+                    (s.quests[p].list || []).forEach(function (q) { q.p = q.n; });
+                  }
+                  afterCheat('Все задания выполнены — забирай награды');
+                }
+                else if (what === 'poor') {
+                  s.coins = 0; s.ore = 0;
+                  s.base.pending = { coins: 0, ore: 0 };
+                  afterCheat('Ресурсы обнулены');
+                }
+              });
             });
 
             root.querySelector('#save-file').addEventListener('click', function () {

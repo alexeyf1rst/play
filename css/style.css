@@ -359,6 +359,16 @@ h4.sec:first-child { margin-top: 4px; }
 .row input[type=range] { width: 45%; accent-color: var(--ink); }
 .row input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--ink); }
 
+.row.give { gap: 8px; }
+.row.give input[type=number] {
+  flex: 1; min-width: 0;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--paper); color: var(--ink);
+  padding: 10px 12px; font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.row.give .btn { flex: none; }
+
 textarea#code-box {
   width: 100%; height: 76px; margin-top: 12px;
   border: 1px solid var(--line); border-radius: 10px;
