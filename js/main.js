@@ -53,13 +53,14 @@ window.HC = window.HC || {};
       requestAnimationFrame(this.frame.bind(this));
 
       var self = this;
-      setInterval(function () {
+      this.saveTimer = setInterval(function () {
         // новый день/неделя/месяц могут наступить прямо во время игры
         if (HC.Quests.ensure(self.state).length) HC.UI.toast('Появились новые задания');
         HC.UI.refreshQuestBadge();
         HC.save(self.state);
       }, 10000);
-      window.addEventListener('beforeunload', function () { HC.save(self.state, true); });
+      this.onUnload = function () { HC.save(self.state, true); };
+      window.addEventListener('beforeunload', this.onUnload);
       document.addEventListener('visibilitychange', function () {
         if (document.hidden) { HC.save(self.state, true); HC.Audio.suspend(); }
         else HC.Audio.resume();
@@ -243,6 +244,19 @@ window.HC = window.HC || {};
           }
         };
       });
+    },
+
+    /* «Начать заново»: стираем всё и перезагружаемся начисто.
+       Порядок важен — сначала глушим автосохранение и обработчик выгрузки,
+       иначе перезагрузка вернула бы стёртый сейв на место. */
+    hardReset: function () {
+      clearInterval(this.saveTimer);
+      window.removeEventListener('beforeunload', this.onUnload);
+      HC.Audio.stop();
+      var removed = HC.wipe();
+      this.state = HC.defaultState();
+      window.location.reload();
+      return removed;
     },
 
     replaceState: function (st) {

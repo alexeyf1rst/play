@@ -732,9 +732,8 @@ window.HC = window.HC || {};
               } catch (e) { UI.toast(e.message); }
             });
             root.querySelector('#wipe').addEventListener('click', function () {
-              if (!window.confirm('Стереть весь прогресс и начать заново? Это не отменить.')) return;
-              HC.wipe();
-              window.location.reload();
+              if (!window.confirm('Стереть весь прогресс и начать заново?\n\nУйдут монеты, руда, машины, прокачка, база и задания. Это не отменить.')) return;
+              G.hardReset();
             });
           }
         };

@@ -12,6 +12,7 @@ window.HC = window.HC || {};
 
   var memoryOnly = false;   // true, если localStorage недоступен
   var lastWrite = 0;
+  var wiped = false;        // после «Начать заново» писать больше нельзя
 
   function now() { return Date.now(); }
 
@@ -155,7 +156,9 @@ window.HC = window.HC || {};
   };
 
   HC.save = function (state, force) {
-    if (!state) return false;
+    // после стирания любые попытки записи игнорируются: иначе обработчик
+    // выгрузки страницы успел бы вернуть старый сейв обратно
+    if (!state || wiped) return false;
     var t = now();
     if (!force && t - lastWrite < 3000) return false;
     lastWrite = t;
@@ -171,9 +174,27 @@ window.HC = window.HC || {};
     }
   };
 
+  /* Полностью убирает игру из памяти браузера и запрещает дальнейшую запись. */
   HC.wipe = function () {
-    try { window.localStorage.removeItem(HC.SAVE_KEY); } catch (e) { /* ничего страшного */ }
+    wiped = true;
+    var removed = 0;
+    try {
+      var kill = [];
+      for (var i = 0; i < window.localStorage.length; i++) {
+        var k = window.localStorage.key(i);
+        // сам сейв и всё, что игра когда-либо могла записать под своим именем
+        if (k === HC.SAVE_KEY || (k && k.indexOf('quiet-hills/') === 0)) kill.push(k);
+      }
+      for (var j = 0; j < kill.length; j++) {
+        window.localStorage.removeItem(kill[j]);
+        removed++;
+      }
+    } catch (e) { /* нечего чистить */ }
+    try { window.sessionStorage.removeItem(HC.SAVE_KEY); } catch (e) { /* ничего */ }
+    return removed;
   };
+
+  HC.isWiped = function () { return wiped; };
 
   HC.isMemoryOnly = function () { return memoryOnly; };
 
