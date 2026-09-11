@@ -17,6 +17,53 @@
 </head>
 <body class="theme-paper">
 
+<!-- Единый набор значков. Рисуются одной линией, цвет наследуют от текста. -->
+<svg id="sprite" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+<symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="3.6"/></symbol>
+<symbol id="i-ore" viewBox="0 0 24 24"><path d="M12 3.4 20 12l-8 8.6L4 12z"/><path d="M12 3.4V20.6M4 12h16"/></symbol>
+<symbol id="i-garage" viewBox="0 0 24 24"><path d="M3 14.5h18M4.6 14.5l1.8-5.2A2 2 0 0 1 8.3 8h7.4a2 2 0 0 1 1.9 1.3l1.8 5.2"/><path d="M3 14.5V18h3v-3.5M21 14.5V18h-3v-3.5"/><circle cx="7.5" cy="14.5" r="1.4"/><circle cx="16.5" cy="14.5" r="1.4"/></symbol>
+<symbol id="i-shop" viewBox="0 0 24 24"><path d="M5 8h14l-1.2 11.2a1.5 1.5 0 0 1-1.5 1.3H7.7a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/></symbol>
+<symbol id="i-quests" viewBox="0 0 24 24"><path d="M11 7h9M11 12h9M11 17h6"/><path d="m3.5 6.6 1.6 1.7L8 5.3M3.5 11.6l1.6 1.7L8 10.3M4 17h2.6"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.4 19 12 8 18.6z" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.1" fill="var(--panel)"/><circle cx="15.5" cy="12" r="2.1" fill="var(--panel)"/><circle cx="8" cy="17" r="2.1" fill="var(--panel)"/></symbol>
+<symbol id="i-sound" viewBox="0 0 24 24"><path d="M10 16.5V6l8-1.6v10"/><circle cx="7.4" cy="16.8" r="2.6"/><circle cx="15.4" cy="14.9" r="2.6"/></symbol>
+<symbol id="i-mute" viewBox="0 0 24 24"><path d="M10 16.5V6l8-1.6v10"/><circle cx="7.4" cy="16.8" r="2.6"/><circle cx="15.4" cy="14.9" r="2.6"/><path d="M4 20 20 4"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><path d="M9.5 5v14M14.5 5v14" stroke-width="2.6"/></symbol>
+<symbol id="i-engine" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></symbol>
+<symbol id="i-tires" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="3"/><path d="M12 3.8v5M12 15.2v5M3.8 12h5M15.2 12h5"/></symbol>
+<symbol id="i-susp" viewBox="0 0 24 24"><path d="M6 4h12M6 20h12"/><path d="M8 4.5 16 8l-8 3.5L16 15l-8 3.5"/></symbol>
+<symbol id="i-fuel" viewBox="0 0 24 24"><path d="M5.5 7.5A1.5 1.5 0 0 1 7 6h7a1.5 1.5 0 0 1 1.5 1.5v11A1.5 1.5 0 0 1 14 20H7a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M8 10h5M15.5 9h2.2a1.3 1.3 0 0 1 1.3 1.3v5.4a1.5 1.5 0 0 1-3 0V14"/></symbol>
+<symbol id="i-magnet" viewBox="0 0 24 24"><path d="M6 18V10a6 6 0 0 1 12 0v8"/><path d="M6 14h4M14 14h4M6 18h4v-4M14 18h4v-4"/></symbol>
+<symbol id="i-gearbox" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2"/><path d="M12 7.5v11"/><path d="M6 11h12M6 11v3M12 11v3M18 11v3"/></symbol>
+<symbol id="i-travel" viewBox="0 0 24 24"><path d="M12 4v16"/><path d="m8 8 4-4 4 4M8 16l4 4 4-4"/></symbol>
+<symbol id="i-press" viewBox="0 0 24 24"><path d="M4.5 16a7.5 7.5 0 1 1 15 0"/><path d="m12 16 4-5"/><circle cx="12" cy="16" r="1.4" fill="currentColor" stroke="none"/><path d="M4.5 19h15"/></symbol>
+<symbol id="i-balance" viewBox="0 0 24 24"><path d="M4 16h16"/><path d="M12 16 7 8h10z"/><path d="M12 8V5"/></symbol>
+<symbol id="i-air" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.4-5.3"/><path d="M19.5 3.5V8H15"/></symbol>
+<symbol id="i-drive" viewBox="0 0 24 24"><circle cx="6.5" cy="16" r="3"/><circle cx="17.5" cy="16" r="3"/><path d="M6.5 10V7h11v3"/></symbol>
+<symbol id="i-mine" viewBox="0 0 24 24"><path d="M3 19h18"/><path d="M6 19V12a6 6 0 0 1 12 0v7"/><path d="M9.5 19v-4a2.5 2.5 0 0 1 5 0v4"/></symbol>
+<symbol id="i-drill" viewBox="0 0 24 24"><path d="M4.5 20h15"/><path d="M8 20 11 4h2l3 16"/><path d="M9.3 13h5.4M8.6 16.5h6.8"/></symbol>
+<symbol id="i-storage" viewBox="0 0 24 24"><path d="M6 20V10a6 6 0 0 1 12 0v10z"/><path d="M6 13.5h12M10 20v-4h4v4"/></symbol>
+<symbol id="i-windmill" viewBox="0 0 24 24"><path d="M9.5 21 12 9l2.5 12z"/><path d="M12 9 6 4.5M12 9l6-4.5M12 9l-3 7M12 9l3 7" stroke-width="1.5"/><circle cx="12" cy="9" r="1.3"/></symbol>
+<symbol id="i-workshop" viewBox="0 0 24 24"><path d="M4 20V10.5L12 4l8 6.5V20z"/><path d="M9.5 20v-5h5v5"/></symbol>
+<symbol id="i-garden" viewBox="0 0 24 24"><path d="M12 21v-6"/><circle cx="12" cy="10" r="5.6"/><path d="m12 15-3.4-3M12 13l3-2.6"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M6 21V4"/><path d="M6 5h11l-2.4 3.6L17 12H6z"/></symbol>
+<symbol id="i-flip" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-3.2-6.4"/><path d="M20.5 3v4.5H16"/><circle cx="12" cy="12" r="2.2"/></symbol>
+<symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1 .3-8 5.5 5.5 0 0 1 10.4 1.6A3.4 3.4 0 0 1 17.5 18z"/><path d="M12 21v-5m-2 2 2-2 2 2" stroke-width="1.5"/></symbol>
+<symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4 10a6 6 0 0 1 6-6h7"/><path d="M14 1.5 17.5 4 14 6.5"/><path d="M20 14a6 6 0 0 1-6 6H7"/><path d="M10 22.5 6.5 20 10 17.5"/></symbol>
+<symbol id="i-collect" viewBox="0 0 24 24"><path d="M4 10h16l-1.4 9.2a1.5 1.5 0 0 1-1.5 1.3H6.9a1.5 1.5 0 0 1-1.5-1.3z"/><path d="m7.5 10 3-6M16.5 10l-3-6"/></symbol>
+<symbol id="i-hammer" viewBox="0 0 24 24"><path d="m11 9-7 7a2 2 0 0 0 2.8 2.8l7-7"/><path d="M9.5 7.5 14 3l6.5 6.5L16 14z"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s6.5-6.2 6.5-10.6A6.5 6.5 0 0 0 5.5 10.4C5.5 14.8 12 21 12 21z"/><circle cx="12" cy="10.4" r="2.4"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 7v5.3l3.4 2"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m4.5 12.8 4.8 4.7L19.5 6.8" stroke-width="2.2"/></symbol>
+<symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 4h8v5.5a4 4 0 0 1-8 0z"/><path d="M8 5.5H5.2v1.8a3 3 0 0 0 3 3M16 5.5h2.8v1.8a3 3 0 0 1-3 3"/><path d="M12 13.5V17M8.5 20h7l-1-3h-5z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-width="2.2"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/></symbol>
+<symbol id="i-road" viewBox="0 0 24 24"><path d="M7 3 4 21M17 3l3 18"/><path d="M12 4v3M12 11v3M12 18v3"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M7 20v-5M12 20V8M17 20v-9"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M5 5h11l3 3v11H5z"/><path d="M8.5 5v5h7V5M8.5 19v-5h7v5"/></symbol>
+<symbol id="i-beaker" viewBox="0 0 24 24"><path d="M9 3v7L4.6 18.4A1.6 1.6 0 0 0 6 20.8h12a1.6 1.6 0 0 0 1.4-2.4L15 10V3"/><path d="M7.5 3h9M6.6 14.5h10.8"/></symbol>
+</svg>
+
 <canvas id="scene"></canvas>
 
 <!-- Экран запуска. За ним по-настоящему едет машина. -->
@@ -26,11 +73,11 @@
     <p class="tagline">холмы · монеты · шахты в долине</p>
   </div>
   <div class="title-bottom">
-    <button id="btn-play" class="btn main go">Играть</button>
+    <button id="btn-play" class="btn main go"><svg class="i"><use href="#i-play"/></svg>Играть</button>
     <p id="title-stats" class="title-stats" hidden></p>
     <div class="title-row">
-      <button id="btn-title-sound" class="icon-btn" title="Музыка" aria-label="Музыка">&#9834;</button>
-      <button id="btn-title-settings" class="icon-btn" title="Настройки" aria-label="Настройки">&#9776;</button>
+      <button id="btn-title-sound" class="icon-btn" title="Музыка" aria-label="Музыка"><svg class="i"><use href="#i-sound"/></svg></button>
+      <button id="btn-title-settings" class="icon-btn" title="Настройки" aria-label="Настройки"><svg class="i"><use href="#i-settings"/></svg></button>
     </div>
   </div>
 </div>
@@ -38,11 +85,11 @@
 <div id="fade"></div>
 
 <header id="top">
-  <div class="res"><i class="ic coin"></i><b id="coins">0</b></div>
-  <div class="res"><i class="ic ore"></i><b id="ore">0</b></div>
+  <div class="res"><svg class="i"><use href="#i-coin"/></svg><b id="coins">0</b></div>
+  <div class="res"><svg class="i"><use href="#i-ore"/></svg><b id="ore">0</b></div>
   <div class="spacer"></div>
-  <button id="btn-sound" class="icon-btn" title="Музыка" aria-label="Музыка">&#9834;</button>
-  <button id="btn-settings" class="icon-btn" title="Настройки" aria-label="Настройки">&#9776;</button>
+  <button id="btn-sound" class="icon-btn" title="Музыка" aria-label="Музыка"><svg class="i"><use href="#i-sound"/></svg></button>
+  <button id="btn-settings" class="icon-btn" title="Настройки" aria-label="Настройки"><svg class="i"><use href="#i-settings"/></svg></button>
 </header>
 
 <button id="pending" hidden></button>
@@ -51,12 +98,12 @@
      по центру главное действие, справа цели. -->
 <nav id="base-bar">
   <div class="bar-zone left">
-    <button id="btn-garage" class="btn">Гараж</button>
-    <button id="btn-shop" class="btn">Магазин</button>
+    <button id="btn-garage" class="btn"><svg class="i"><use href="#i-garage"/></svg>Гараж</button>
+    <button id="btn-shop" class="btn"><svg class="i"><use href="#i-shop"/></svg>Магазин</button>
   </div>
-  <button id="btn-ride" class="btn main go">Поехать</button>
+  <button id="btn-ride" class="btn main go"><svg class="i"><use href="#i-play"/></svg>Поехать</button>
   <div class="bar-zone right">
-    <button id="btn-quests" class="btn">Задания<b id="quest-badge" hidden>0</b></button>
+    <button id="btn-quests" class="btn"><svg class="i"><use href="#i-quests"/></svg>Задания<b id="quest-badge" hidden>0</b></button>
   </div>
 </nav>
 
@@ -71,8 +118,8 @@
       <span id="dist">0 м</span>
     </div>
     <div class="hud-zone right">
-      <span class="run-coins"><i class="ic coin"></i><span id="run-coins">0</span></span>
-      <button id="btn-pause" class="icon-btn" title="Пауза" aria-label="Пауза">&#10073;&#10073;</button>
+      <span class="run-coins"><svg class="i"><use href="#i-coin"/></svg><span id="run-coins">0</span></span>
+      <button id="btn-pause" class="icon-btn" title="Пауза" aria-label="Пауза"><svg class="i"><use href="#i-pause"/></svg></button>
     </div>
   </div>
   <div id="pedals">

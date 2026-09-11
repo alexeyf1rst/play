@@ -402,7 +402,7 @@ window.HC = window.HC || {};
 
       // общая рамка и общая линия земли — постройки в списке стоят рядом,
       // как стояли бы в долине, и видно, кто выше
-      var box = { x0: -74, x1: 74, y0: -92, y1: 12 };
+      var box = { x0: -80, x1: 80, y0: -106, y1: 12 };
       var s = Math.min(W / (box.x1 - box.x0), H / (box.y1 - box.y0));
       g.translate(W / 2, H - 2);
       g.scale(s, s);
@@ -472,110 +472,227 @@ window.HC = window.HC || {};
     },
 
     shapes: {
+      /* Шахта: копёр с колесом, укреплённый вход, рельсы и вагонетка */
       mine: function (g, P, level, t) {
+        var ink = P.ink;
         // отвал породы
         g.fillStyle = P.far1;
-        g.beginPath(); g.moveTo(-58, 0); g.lineTo(-30, -40); g.lineTo(4, 0); g.closePath();
+        g.beginPath();
+        g.moveTo(-62, 0); g.quadraticCurveTo(-46, -34, -30, -42);
+        g.quadraticCurveTo(-14, -30, -2, 0);
+        g.closePath(); g.fill(); g.stroke();
+        g.lineWidth = 1.3; g.globalAlpha = 0.5;
+        g.beginPath(); g.moveTo(-48, -12); g.lineTo(-38, -22); g.moveTo(-24, -18); g.lineTo(-14, -8); g.stroke();
+        g.globalAlpha = 1; g.lineWidth = 2.4;
+
+        // копёр
+        g.strokeStyle = ink; g.lineWidth = 2.8;
+        g.beginPath(); g.moveTo(-42, -40); g.lineTo(-30, -82); g.lineTo(-18, -40); g.stroke();
+        g.lineWidth = 2;
+        g.beginPath(); g.moveTo(-37, -58); g.lineTo(-23, -58); g.moveTo(-40, -48); g.lineTo(-20, -48); g.stroke();
+        g.beginPath(); g.moveTo(-37, -58); g.lineTo(-20, -48); g.moveTo(-23, -58); g.lineTo(-40, -48); g.stroke();
+        // колесо копра
+        g.save(); g.translate(-30, -86); g.rotate(t * 0.55);
+        var wg = g.createLinearGradient(-13, -13, 13, 13);
+        wg.addColorStop(0, P.bodyHi || P.rim); wg.addColorStop(1, P.rimShade || P.rim);
+        g.fillStyle = wg; g.lineWidth = 2.4;
+        g.beginPath(); g.arc(0, 0, 13, 0, 6.3); g.fill(); g.stroke();
+        g.lineWidth = 1.6;
+        for (var s2 = 0; s2 < 6; s2++) {
+          var a = s2 / 6 * Math.PI * 2;
+          g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * 13, Math.sin(a) * 13); g.stroke();
+        }
+        g.beginPath(); g.arc(0, 0, 3.2, 0, 6.3); g.stroke();
+        g.restore();
+        // трос
+        g.lineWidth = 1.6; g.globalAlpha = 0.7;
+        g.beginPath(); g.moveTo(-30, -86); g.lineTo(-30, -34); g.stroke();
+        g.globalAlpha = 1;
+
+        // вход, укреплённый брусом
+        g.lineWidth = 2.4;
+        g.fillStyle = ink;
+        g.beginPath();
+        g.moveTo(-44, 0); g.lineTo(-44, -22); g.quadraticCurveTo(-30, -36, -16, -22); g.lineTo(-16, 0);
+        g.closePath(); g.fill();
+        g.strokeStyle = ink; g.lineWidth = 3.4;
+        g.beginPath();
+        g.moveTo(-48, 0); g.lineTo(-48, -24); g.quadraticCurveTo(-30, -40, -12, -24); g.lineTo(-12, 0);
+        g.stroke();
+
+        // рельсы со шпалами
+        g.lineWidth = 1.6;
+        for (var i = 0; i < 9; i++) {
+          g.beginPath(); g.moveTo(-12 + i * 8, -7); g.lineTo(-12 + i * 8, 1); g.stroke();
+        }
+        g.lineWidth = 2;
+        g.beginPath(); g.moveTo(-14, -6); g.lineTo(62, -6); g.moveTo(-14, 0); g.lineTo(62, 0); g.stroke();
+
+        // вагонетка с рудой
+        var k = Math.sin(t * 0.32) * 0.5 + 0.5;
+        var cx = 2 + k * 46;
+        g.save(); g.translate(cx, -14);
+        var cg = g.createLinearGradient(0, -12, 0, 8);
+        cg.addColorStop(0, P.bodyHi || P.bodyFill); cg.addColorStop(1, P.bodyShade || P.bodyFill);
+        g.fillStyle = cg; g.lineWidth = 2.2;
+        g.beginPath(); g.moveTo(-13, -11); g.lineTo(13, -11); g.lineTo(10, 7); g.lineTo(-10, 7); g.closePath();
         g.fill(); g.stroke();
-        // вход
         g.fillStyle = P.ink;
         g.beginPath();
-        g.moveTo(-44, 0); g.lineTo(-44, -20); g.quadraticCurveTo(-30, -34, -16, -20); g.lineTo(-16, 0);
+        g.moveTo(-11, -11); g.lineTo(-5, -16); g.lineTo(1, -12); g.lineTo(7, -17); g.lineTo(11, -11);
         g.closePath(); g.fill();
-        // рельсы
-        g.strokeStyle = P.ink; g.lineWidth = 2;
-        g.beginPath(); g.moveTo(-20, -4); g.lineTo(40, -4); g.moveTo(-20, 0); g.lineTo(40, 0); g.stroke();
-        for (var i = 0; i < 7; i++) {
-          g.beginPath(); g.moveTo(-16 + i * 9, -6); g.lineTo(-16 + i * 9, 2); g.stroke();
-        }
-        // вагонетка ездит туда-сюда
-        var k = (Math.sin(t * 0.35) * 0.5 + 0.5);
-        var cx = -10 + k * 44;
-        g.save(); g.translate(cx, -12);
-        g.fillStyle = P.bodyFill; g.lineWidth = 2.2;
-        g.beginPath(); g.moveTo(-11, -9); g.lineTo(11, -9); g.lineTo(8, 6); g.lineTo(-8, 6); g.closePath();
-        g.fill(); g.stroke();
-        g.beginPath(); g.arc(-5, 8, 3.4, 0, 6.3); g.fill(); g.stroke();
-        g.beginPath(); g.arc(5, 8, 3.4, 0, 6.3); g.fill(); g.stroke();
-        g.restore();
-        // копёр с колесом
-        g.lineWidth = 2.4;
-        g.beginPath(); g.moveTo(-30, -40); g.lineTo(-30, -66); g.stroke();
-        g.save(); g.translate(-30, -70); g.rotate(t * 0.5);
-        g.fillStyle = P.rim;
-        g.beginPath(); g.arc(0, 0, 12, 0, 6.3); g.fill(); g.stroke();
-        g.lineWidth = 1.8;
-        for (var s2 = 0; s2 < 4; s2++) {
-          var a = s2 / 4 * Math.PI * 2;
-          g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * 12, Math.sin(a) * 12); g.stroke();
-        }
+        g.fillStyle = P.rim; g.lineWidth = 2;
+        g.beginPath(); g.arc(-6, 9, 3.6, 0, 6.3); g.fill(); g.stroke();
+        g.beginPath(); g.arc(6, 9, 3.6, 0, 6.3); g.fill(); g.stroke();
         g.restore();
       },
 
+      /* Бур: вышка с раскосами, кронблок и будка */
       drill: function (g, P, level, t) {
-        g.fillStyle = P.bodyFill;
-        // вышка
-        g.beginPath();
-        g.moveTo(-30, 0); g.lineTo(-12, -76); g.lineTo(12, -76); g.lineTo(30, 0);
-        g.closePath(); g.fill(); g.stroke();
-        g.lineWidth = 1.8;
-        for (var i = 1; i < 4; i++) {
-          var y = -i * 19;
-          var w = 30 - i * 4.7;
-          g.beginPath(); g.moveTo(-w, y); g.lineTo(w, y); g.stroke();
-          g.beginPath(); g.moveTo(-w, y); g.lineTo(w - 6, y + 19); g.stroke();
+        // площадка
+        g.fillStyle = P.far1; g.strokeStyle = P.ink; g.lineWidth = 2.2;
+        g.beginPath(); g.rect(-46, -6, 92, 8); g.fill(); g.stroke();
+
+        var dg = g.createLinearGradient(-30, -86, 30, 0);
+        dg.addColorStop(0, P.bodyHi || P.bodyFill);
+        dg.addColorStop(1, P.bodyShade || P.bodyFill);
+
+        // ноги вышки
+        g.strokeStyle = P.ink; g.lineWidth = 2.8;
+        g.beginPath(); g.moveTo(-28, -6); g.lineTo(-10, -84); g.moveTo(28, -6); g.lineTo(10, -84); g.stroke();
+        // раскосы
+        g.lineWidth = 1.7;
+        for (var i = 0; i < 5; i++) {
+          var f0 = i / 5, f1 = (i + 1) / 5;
+          var lx0 = -28 + 18 * f0, rx0 = 28 - 18 * f0, y0 = -6 - 78 * f0;
+          var lx1 = -28 + 18 * f1, rx1 = 28 - 18 * f1, y1 = -6 - 78 * f1;
+          g.beginPath(); g.moveTo(lx0, y0); g.lineTo(rx0, y0); g.stroke();
+          g.beginPath(); g.moveTo(lx0, y0); g.lineTo(rx1, y1); g.moveTo(rx0, y0); g.lineTo(lx1, y1); g.stroke();
         }
-        // бур крутится
-        g.lineWidth = 2.4;
-        g.save(); g.translate(0, -8); g.rotate(t * 1.6);
-        g.fillStyle = P.rim;
-        g.beginPath(); g.moveTo(-7, -10); g.lineTo(7, -10); g.lineTo(0, 12); g.closePath();
+        // кронблок
+        g.lineWidth = 2.4; g.fillStyle = dg;
+        g.beginPath(); g.rect(-12, -92, 24, 9); g.fill(); g.stroke();
+        g.beginPath(); g.moveTo(-8, -92); g.lineTo(0, -99); g.lineTo(8, -92); g.stroke();
+
+        // бурильная труба и долото
+        g.lineWidth = 2.2;
+        g.beginPath(); g.moveTo(0, -83); g.lineTo(0, -22); g.stroke();
+        g.save(); g.translate(0, -14); g.rotate(t * 1.9);
+        g.fillStyle = P.rim; g.lineWidth = 2.2;
+        g.beginPath(); g.moveTo(-8, -9); g.lineTo(8, -9); g.lineTo(0, 10); g.closePath();
         g.fill(); g.stroke();
         g.restore();
-        // площадка
-        g.fillStyle = P.far1;
-        g.beginPath(); g.rect(-40, 0, 80, 7); g.fill(); g.stroke();
+
+        // будка с трубой
+        g.fillStyle = dg; g.lineWidth = 2.2;
+        g.beginPath(); g.rect(32, -30, 30, 24); g.fill(); g.stroke();
+        g.beginPath(); g.moveTo(30, -30); g.lineTo(47, -40); g.lineTo(64, -30); g.closePath(); g.fill(); g.stroke();
+        g.fillStyle = P.ink;
+        g.beginPath(); g.rect(42, -20, 11, 14); g.fill();
       },
 
+      /* Склад: силос с конической крышей, лестница, бочки */
       storage: function (g, P, level, t) {
-        g.fillStyle = P.bodyFill;
-        // силос
+        var sg = g.createLinearGradient(-34, 0, 34, 0);
+        sg.addColorStop(0, P.bodyHi || P.bodyFill);
+        sg.addColorStop(0.55, P.bodyFill);
+        sg.addColorStop(1, P.bodyShade || P.bodyFill);
+        g.fillStyle = sg; g.strokeStyle = P.ink; g.lineWidth = 2.4;
+
+        // корпус
+        g.beginPath(); g.rect(-32, -60, 64, 60); g.fill(); g.stroke();
+        // обручи
+        g.lineWidth = 1.5; g.globalAlpha = 0.7;
         g.beginPath();
-        g.moveTo(-34, 0); g.lineTo(-34, -54);
-        g.quadraticCurveTo(-34, -76, 0, -76);
-        g.quadraticCurveTo(34, -76, 34, -54);
-        g.lineTo(34, 0); g.closePath();
-        g.fill(); g.stroke();
-        g.lineWidth = 1.6;
-        g.beginPath(); g.moveTo(-34, -34); g.lineTo(34, -34); g.moveTo(-34, -16); g.lineTo(34, -16); g.stroke();
-        // дверца
+        g.moveTo(-32, -46); g.lineTo(32, -46);
+        g.moveTo(-32, -30); g.lineTo(32, -30);
+        g.moveTo(-32, -14); g.lineTo(32, -14);
+        g.stroke();
+        g.globalAlpha = 1; g.lineWidth = 2.4;
+        // крыша
+        g.beginPath();
+        g.moveTo(-38, -60); g.lineTo(0, -84); g.lineTo(38, -60);
+        g.closePath(); g.fill(); g.stroke();
+        g.beginPath(); g.moveTo(0, -84); g.lineTo(0, -90); g.stroke();
+        // дверь
+        g.fillStyle = P.ink;
+        g.beginPath(); g.moveTo(-11, 0); g.lineTo(-11, -18); g.quadraticCurveTo(0, -26, 11, -18); g.lineTo(11, 0);
+        g.closePath(); g.fill();
+        // лестница сбоку
+        g.strokeStyle = P.ink; g.lineWidth = 1.8;
+        g.beginPath(); g.moveTo(24, 0); g.lineTo(24, -58); g.moveTo(30, 0); g.lineTo(30, -58); g.stroke();
+        for (var i = 0; i < 7; i++) {
+          g.beginPath(); g.moveTo(24, -6 - i * 8); g.lineTo(30, -6 - i * 8); g.stroke();
+        }
+        // бочки
+        g.lineWidth = 2.2;
+        [[-50, 1], [-63, 0.85]].forEach(function (b) {
+          g.save(); g.translate(b[0], 0); g.scale(b[1], b[1]);
+          var bg = g.createLinearGradient(-9, 0, 9, 0);
+          bg.addColorStop(0, P.bodyHi || P.bodyFill); bg.addColorStop(1, P.bodyShade || P.bodyFill);
+          g.fillStyle = bg;
+          g.beginPath(); g.rect(-9, -22, 18, 22); g.fill(); g.stroke();
+          g.lineWidth = 1.3;
+          g.beginPath(); g.moveTo(-9, -16); g.lineTo(9, -16); g.moveTo(-9, -7); g.lineTo(9, -7); g.stroke();
+          g.lineWidth = 2.2;
+          g.restore();
+        });
+      },
+
+      /* Ветряк: настоящая мельница с колпаком, балконом и решётчатыми крыльями */
+      windmill: function (g, P, level, t) {
+        var mg = g.createLinearGradient(-26, 0, 26, 0);
+        mg.addColorStop(0, P.bodyHi || P.bodyFill);
+        mg.addColorStop(0.5, P.bodyFill);
+        mg.addColorStop(1, P.bodyShade || P.bodyFill);
+        g.fillStyle = mg; g.strokeStyle = P.ink; g.lineWidth = 2.4;
+
+        // башня
+        g.beginPath();
+        g.moveTo(-24, 0); g.lineTo(-12, -68); g.lineTo(12, -68); g.lineTo(24, 0);
+        g.closePath(); g.fill(); g.stroke();
+        // кладка
+        g.lineWidth = 1.3; g.globalAlpha = 0.45;
+        g.beginPath();
+        g.moveTo(-20, -22); g.lineTo(20, -22);
+        g.moveTo(-16, -44); g.lineTo(16, -44);
+        g.stroke();
+        g.globalAlpha = 1; g.lineWidth = 2.4;
+        // балкон
+        g.beginPath(); g.rect(-22, -38, 44, 5); g.fill(); g.stroke();
+        g.lineWidth = 1.5;
+        for (var i = 0; i < 6; i++) {
+          g.beginPath(); g.moveTo(-20 + i * 8, -38); g.lineTo(-20 + i * 8, -45); g.stroke();
+        }
+        g.beginPath(); g.moveTo(-21, -45); g.lineTo(21, -45); g.stroke();
+        // дверь и окно
         g.lineWidth = 2.2;
         g.fillStyle = P.ink;
-        g.beginPath(); g.rect(-10, -18, 20, 18); g.fill();
-        // пристройка
-        g.fillStyle = P.bodyFill;
+        g.beginPath(); g.moveTo(-8, 0); g.lineTo(-8, -14); g.quadraticCurveTo(0, -21, 8, -14); g.lineTo(8, 0);
+        g.closePath(); g.fill();
+        g.fillStyle = P.rim;
+        g.beginPath(); g.arc(0, -54, 5, 0, 6.3); g.fill(); g.stroke();
+        // колпак
+        g.fillStyle = mg;
         g.beginPath();
-        g.moveTo(34, 0); g.lineTo(34, -26); g.lineTo(60, -34); g.lineTo(60, 0);
+        g.moveTo(-16, -68); g.quadraticCurveTo(0, -88, 16, -68);
         g.closePath(); g.fill(); g.stroke();
-      },
 
-      windmill: function (g, P, level, t) {
-        g.fillStyle = P.bodyFill;
-        g.beginPath();
-        g.moveTo(-20, 0); g.lineTo(-9, -70); g.lineTo(9, -70); g.lineTo(20, 0);
-        g.closePath(); g.fill(); g.stroke();
-        g.lineWidth = 1.6;
-        g.beginPath(); g.moveTo(-15, -30); g.lineTo(15, -30); g.stroke();
+        // крылья — решётка, а не глухие треугольники
         g.save();
-        g.translate(0, -74);
-        g.rotate(t * 0.32);        // медленно, чтобы не мельтешило
-        g.lineWidth = 2.4;
-        g.fillStyle = P.bodyFill;
+        g.translate(0, -72);
+        g.rotate(t * 0.26);
+        g.lineWidth = 2.2;
         for (var b = 0; b < 4; b++) {
           g.save(); g.rotate(b / 4 * Math.PI * 2);
-          g.beginPath();
-          g.moveTo(0, 0); g.lineTo(-5, -40); g.lineTo(5, -40); g.closePath();
-          g.fill(); g.stroke();
+          g.beginPath(); g.moveTo(0, -4); g.lineTo(0, -46); g.stroke();
+          g.lineWidth = 1.5;
+          g.beginPath(); g.moveTo(-7, -10); g.lineTo(-7, -44); g.moveTo(5, -10); g.lineTo(5, -44); g.stroke();
+          for (var r2 = 0; r2 < 5; r2++) {
+            var yy = -12 - r2 * 8;
+            g.beginPath(); g.moveTo(-7, yy); g.lineTo(5, yy); g.stroke();
+          }
+          g.lineWidth = 2.2;
           g.restore();
         }
         g.fillStyle = P.ink;
@@ -583,53 +700,105 @@ window.HC = window.HC || {};
         g.restore();
       },
 
+      /* Мастерская: дом с крыльцом, вывеской, верстаком и дымком */
       workshop: function (g, P, level, t) {
-        g.fillStyle = P.bodyFill;
-        g.beginPath(); g.rect(-46, -44, 92, 44); g.fill(); g.stroke();
-        g.beginPath();
-        g.moveTo(-54, -44); g.lineTo(0, -74); g.lineTo(54, -44); g.closePath();
-        g.fill(); g.stroke();
-        // дверь и окно
-        g.fillStyle = P.ink;
-        g.beginPath(); g.rect(-30, -28, 22, 28); g.fill();
-        g.fillStyle = P.rim;
-        g.beginPath(); g.rect(6, -32, 26, 20); g.fill(); g.stroke();
-        g.lineWidth = 1.6;
-        g.beginPath(); g.moveTo(19, -32); g.lineTo(19, -12); g.moveTo(6, -22); g.lineTo(32, -22); g.stroke();
+        var hg = g.createLinearGradient(0, -46, 0, 0);
+        hg.addColorStop(0, P.bodyHi || P.bodyFill);
+        hg.addColorStop(1, P.bodyShade || P.bodyFill);
+        g.fillStyle = hg; g.strokeStyle = P.ink; g.lineWidth = 2.4;
+
         // труба и дымок
-        g.lineWidth = 2.4;
-        g.fillStyle = P.bodyFill;
-        g.beginPath(); g.rect(24, -78, 14, 26); g.fill(); g.stroke();
-        g.globalAlpha = 0.3;
-        g.fillStyle = P.ink;
-        for (var i = 0; i < 3; i++) {
-          var p = (t * 0.25 + i / 3) % 1;
+        g.beginPath(); g.rect(22, -80, 13, 28); g.fill(); g.stroke();
+        g.beginPath(); g.rect(20, -84, 17, 6); g.fill(); g.stroke();
+        g.save();
+        g.globalAlpha = 0.22; g.fillStyle = P.ink;
+        for (var i = 0; i < 4; i++) {
+          var p = (t * 0.22 + i / 4) % 1;
           g.beginPath();
-          g.arc(31 + Math.sin(p * 5) * 7, -82 - p * 46, 4 + p * 8, 0, 6.3);
+          g.arc(28 + Math.sin(p * 5.2) * 9, -88 - p * 44, 4 + p * 9, 0, 6.3);
           g.fill();
         }
+        g.restore();
         g.globalAlpha = 1;
+
+        // корпус
+        g.fillStyle = hg;
+        g.beginPath(); g.rect(-48, -44, 96, 44); g.fill(); g.stroke();
+        // крыша с карнизом
+        g.beginPath();
+        g.moveTo(-58, -44); g.lineTo(0, -76); g.lineTo(58, -44);
+        g.closePath(); g.fill(); g.stroke();
+        g.lineWidth = 1.4; g.globalAlpha = 0.5;
+        g.beginPath();
+        g.moveTo(-44, -52); g.lineTo(44, -52); g.moveTo(-30, -60); g.lineTo(30, -60);
+        g.stroke();
+        g.globalAlpha = 1; g.lineWidth = 2.2;
+
+        // дверь с козырьком
+        g.fillStyle = P.ink;
+        g.beginPath(); g.rect(-34, -28, 22, 28); g.fill();
+        g.strokeStyle = P.ink;
+        g.beginPath(); g.moveTo(-40, -30); g.lineTo(-6, -30); g.stroke();
+        // окно с переплётом
+        g.fillStyle = P.rim;
+        g.beginPath(); g.rect(4, -34, 30, 22); g.fill(); g.stroke();
+        g.lineWidth = 1.5;
+        g.beginPath(); g.moveTo(19, -34); g.lineTo(19, -12); g.moveTo(4, -23); g.lineTo(34, -23); g.stroke();
+
+        // вывеска
+        g.lineWidth = 2;
+        g.beginPath(); g.moveTo(48, -38); g.lineTo(62, -38); g.stroke();
+        var sg2 = g.createLinearGradient(0, -38, 0, -20);
+        sg2.addColorStop(0, P.bodyHi || P.bodyFill); sg2.addColorStop(1, P.bodyShade || P.bodyFill);
+        g.fillStyle = sg2;
+        g.beginPath(); g.rect(52, -34, 18, 14); g.fill(); g.stroke();
+        g.lineWidth = 1.6;
+        g.beginPath(); g.moveTo(57, -30); g.lineTo(65, -24); g.moveTo(65, -30); g.lineTo(57, -24); g.stroke();
+
+        // верстак
+        g.lineWidth = 2.2; g.fillStyle = P.bodyFill;
+        g.beginPath(); g.rect(-74, -16, 22, 4); g.fill(); g.stroke();
+        g.lineWidth = 2;
+        g.beginPath(); g.moveTo(-70, -12); g.lineTo(-70, 0); g.moveTo(-56, -12); g.lineTo(-56, 0); g.stroke();
+        g.beginPath(); g.arc(-63, -22, 5, 0, 6.3); g.stroke();
       },
 
+      /* Сад: деревья, скамейка, кустики и оградка */
       garden: function (g, P, level, t) {
-        var self = this;
         function tree(x, sc, phase) {
           g.save();
           g.translate(x, 0); g.scale(sc, sc);
-          g.rotate(Math.sin(t * 0.4 + phase) * 0.02);
-          g.strokeStyle = P.ink; g.lineWidth = 3 / sc;
-          g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -30); g.stroke();
-          g.lineWidth = 2.4 / sc;
-          g.fillStyle = P.bodyFill;
-          g.beginPath(); g.arc(0, -46, 20, 0, 6.3); g.fill(); g.stroke();
-          g.beginPath(); g.arc(-13, -36, 13, 0, 6.3); g.fill(); g.stroke();
-          g.beginPath(); g.arc(14, -37, 12, 0, 6.3); g.fill(); g.stroke();
+          g.rotate(Math.sin(t * 0.35 + phase) * 0.018);
+          HC.Decor.draw(g, 'tree', P, 1, phase > 1);
           g.restore();
         }
-        tree(-26, 1.05, 0);
-        tree(24, 0.85, 1.7);
-        g.strokeStyle = P.ink; g.lineWidth = 2.2; g.fillStyle = P.far1;
-        g.beginPath(); g.arc(0, -8, 11, Math.PI, 0); g.fill(); g.stroke();
+        // оградка
+        g.strokeStyle = P.ink; g.lineWidth = 2; g.lineCap = 'round';
+        for (var i = 0; i < 7; i++) {
+          var x = -58 + i * 19;
+          g.beginPath(); g.moveTo(x, 2); g.lineTo(x, -15); g.stroke();
+        }
+        g.lineWidth = 1.7;
+        g.beginPath(); g.moveTo(-60, -11); g.lineTo(58, -11); g.moveTo(-60, -4); g.lineTo(58, -4); g.stroke();
+
+        tree(-34, 1.0, 0);
+        tree(30, 0.82, 1.7);
+
+        // скамейка
+        g.lineWidth = 2.2; g.strokeStyle = P.ink;
+        var bg2 = g.createLinearGradient(0, -20, 0, -8);
+        bg2.addColorStop(0, P.bodyHi || P.bodyFill); bg2.addColorStop(1, P.bodyShade || P.bodyFill);
+        g.fillStyle = bg2;
+        g.beginPath(); g.rect(-12, -14, 30, 5); g.fill(); g.stroke();
+        g.lineWidth = 1.8;
+        g.beginPath(); g.moveTo(-8, -9); g.lineTo(-8, 0); g.moveTo(14, -9); g.lineTo(14, 0); g.stroke();
+        g.beginPath(); g.moveTo(-10, -14); g.lineTo(-10, -24); g.moveTo(16, -14); g.lineTo(16, -24); g.stroke();
+        g.beginPath(); g.moveTo(-11, -21); g.lineTo(17, -21); g.stroke();
+
+        // кустики
+        g.save(); g.translate(-62, 0); g.scale(0.8, 0.8);
+        HC.Decor.draw(g, 'bush', P, 1, false);
+        g.restore();
       }
     }
   };

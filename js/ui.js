@@ -10,6 +10,20 @@ window.HC = window.HC || {};
   var el = {};
 
   function $(id) { return document.getElementById(id); }
+
+  /* Значок из общего набора. Цвет наследует от текста. */
+  function ic(name, cls) {
+    return '<svg class="i' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + name + '"/></svg>';
+  }
+  HC.icon = ic;
+
+  var UP_ICON = { engine: 'engine', tires: 'tires', susp: 'susp', fuel: 'fuel', magnet: 'magnet' };
+  var TUNE_ICON = { gear: 'gearbox', stiff: 'susp', travel: 'travel', press: 'press', balance: 'balance', air: 'air' };
+  var QUEST_ICON = {
+    dist_run: 'flag', coins_run: 'coin', dist_total: 'road', coins_earn: 'coin',
+    flips: 'flip', air: 'cloud', ore: 'ore', runs: 'repeat', cans: 'fuel',
+    collect: 'collect', build: 'hammer', track_dist: 'pin'
+  };
   function money(n) { return HC.fmt(n); }
   function can(cost, ore) {
     var s = G.state;
@@ -23,8 +37,8 @@ window.HC = window.HC || {};
   }
   function priceTag(cost, ore) {
     var out = '<span class="price' + (can(cost, ore) ? '' : ' short') + '">';
-    if (cost) out += '<i class="ic coin"></i>' + money(cost);
-    if (ore) out += '<i class="ic ore"></i>' + money(ore);
+    if (cost) out += ic('coin') + money(cost);
+    if (ore) out += ic('ore') + money(ore);
     if (!cost && !ore) out += 'бесплатно';
     return out + '</span>';
   }
@@ -118,8 +132,8 @@ window.HC = window.HC || {};
       el.pending.hidden = false;
       var full = c >= cap.coins || (o >= cap.ore && cap.ore > 0);
       el.pending.className = full ? 'full' : '';
-      el.pending.innerHTML = '<b>Собрать</b><span><i class="ic coin"></i>' + money(c) +
-        (o ? ' <i class="ic ore"></i>' + money(o) : '') + '</span>' +
+      el.pending.innerHTML = '<b>' + ic('collect', 'sm') + 'Собрать</b><span>' + ic('coin', 'sm') + money(c) +
+        (o ? ' ' + ic('ore', 'sm') + money(o) : '') + '</span>' +
         (full ? '<em>склад полон</em>' : '');
     },
 
@@ -159,9 +173,9 @@ window.HC = window.HC || {};
           var owned = !!s.tracks[id];
           var best = s.stats.best[id] || 0;
           html += '<div class="card' + (owned ? '' : ' locked') + '">' +
-            '<div class="card-main"><h3>' + t.name + '</h3><p>' + t.about + '</p>' +
+            '<div class="card-main"><h3>' + ic(owned ? 'road' : 'lock') + t.name + '</h3><p>' + t.about + '</p>' +
             '<p class="muted">награда ×' + t.payout.toFixed(2) +
-            (best ? ' · рекорд ' + best + ' м' : '') + '</p></div>' +
+            (best ? ' · ' + ic('trophy', 'sm') + ' рекорд ' + best + ' м' : '') + '</p></div>' +
             '<div class="card-side">' +
             (owned
               ? '<button class="btn main" data-go="' + id + '">Поехать</button>'
@@ -211,7 +225,8 @@ window.HC = window.HC || {};
           var ore = maxed ? 0 : HC.upOreCostOf(u, lvl);
           var pct = Math.round(lvl / u.max * 100);
           html += '<div class="card"><div class="card-main">' +
-            '<h3>' + u.name + ' <span class="lvl">' + lvl + ' / ' + u.max + '</span></h3>' +
+            '<h3>' + ic(UP_ICON[uid] || 'engine') + u.name +
+            ' <span class="lvl">' + lvl + ' / ' + u.max + '</span></h3>' +
             '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
             '<p>' + u.about + '</p></div>' +
             '<div class="card-side">' +
@@ -221,11 +236,11 @@ window.HC = window.HC || {};
         });
         // --- тюнинг: бесплатные ползунки, влияющие на физику напрямую ---
         var tune = s.tune[vid] || HC.defaultTune(vid);
-        html += '<h4 class="sec">Тюнинг</h4>' +
+        html += '<h4 class="sec">' + ic('settings') + 'Тюнинг</h4>' +
           '<p class="muted">Ничего не стоит и меняется в любой момент. Это настоящие ' +
           'множители в расчёте физики, а не надписи.</p>';
 
-        html += '<div class="tune"><div class="tune-head"><b>Привод</b></div><div class="seg">';
+        html += '<div class="tune"><div class="tune-head"><b>' + ic('drive', 'sm') + ' Привод</b></div><div class="seg">';
         Object.keys(HC.DRIVE).forEach(function (mode) {
           html += '<button class="' + (tune.drive === mode ? 'on' : '') + '" data-drive="' + mode + '">' +
                   HC.DRIVE[mode].name + '</button>';
@@ -235,7 +250,8 @@ window.HC = window.HC || {};
         Object.keys(HC.TUNING).forEach(function (k) {
           var K = HC.TUNING[k], val = typeof tune[k] === 'number' ? tune[k] : K.def;
           html += '<div class="tune">' +
-            '<div class="tune-head"><b>' + K.name + '</b><em data-tv="' + k + '">' + UI.tuneLabel(k, val) + '</em></div>' +
+            '<div class="tune-head"><b>' + ic(TUNE_ICON[k] || 'settings', 'sm') + ' ' + K.name + '</b>' +
+            '<em data-tv="' + k + '">' + UI.tuneLabel(k, val) + '</em></div>' +
             '<input type="range" data-tune="' + k + '" min="' + Math.round(K.min * 100) + '" max="' + Math.round(K.max * 100) +
             '" step="' + Math.round(K.step * 100) + '" value="' + Math.round(val * 100) + '">' +
             '<div class="tune-ends"><i>' + K.low + '</i><i>' + K.high + '</i></div>' +
@@ -312,7 +328,7 @@ window.HC = window.HC || {};
 
         var cost = HC.Economy.plotCost(s);
         var left = HC.PLOTS.spots.length - s.base.unlocked;
-        html += '<h4 class="sec">Участки под постройки</h4>' +
+        html += '<h4 class="sec">' + ic('plus') + 'Участки под постройки</h4>' +
           '<div class="card"><div class="card-main"><h3>Новый участок</h3>' +
           '<p>' + (left > 0 ? 'Свободных мест в долине: ' + left + '.' : 'Вся долина застроена.') + '</p></div>' +
           '<div class="card-side">' +
@@ -370,7 +386,7 @@ window.HC = window.HC || {};
             var d = HC.BUILDINGS[bid];
             var cost = HC.costOf(d, 0), ore = HC.oreCostOf(d, 0);
             html += '<div class="card">' + buildingPic(bid) +
-              '<div class="card-main"><h3>' + d.name + '</h3><p>' + d.about + '</p>' +
+              '<div class="card-main"><h3>' + ic(bid) + d.name + '</h3><p>' + d.about + '</p>' +
               '<p class="muted">' + UI.buildingEffect(bid, 1) + '</p></div>' +
               '<div class="card-side"><button class="btn" data-build="' + bid + '" ' + (can(cost, ore) ? '' : 'disabled') + '>Построить</button>' +
               priceTag(cost, ore) + '</div></div>';
@@ -382,8 +398,8 @@ window.HC = window.HC || {};
           var cost = maxed ? 0 : HC.costOf(d, plot.level);
           var ore = maxed ? 0 : HC.oreCostOf(d, plot.level);
           html = '<div class="hero">' + buildingPic(plot.type, 190, 140) + '<p>' + d.about + '</p></div>' +
-            '<div class="stat"><span>сейчас</span><b>' + UI.buildingEffect(plot.type, plot.level) + '</b></div>' +
-            (maxed ? '' : '<div class="stat"><span>станет</span><b>' + UI.buildingEffect(plot.type, plot.level + 1) + '</b></div>') +
+            '<div class="stat"><span>' + ic(plot.type, 'sm') + 'сейчас</span><b>' + UI.buildingEffect(plot.type, plot.level) + '</b></div>' +
+            (maxed ? '' : '<div class="stat"><span>' + ic('plus', 'sm') + 'станет</span><b>' + UI.buildingEffect(plot.type, plot.level + 1) + '</b></div>') +
             '<div class="card"><div class="card-main"><h3>' + (maxed ? 'Дальше некуда' : 'Улучшить до ' + (plot.level + 1)) + '</h3>' +
             '<div class="bar"><i style="width:' + Math.round(plot.level / d.max * 100) + '%"></i></div></div>' +
             '<div class="card-side">' +
@@ -462,13 +478,13 @@ window.HC = window.HC || {};
         var html = '<p class="lead">' + r.reason + (r.record ? ' · новый рекорд!' : '') + '</p>' +
           '<div class="result"><div class="big">' + r.distance + ' <small>м</small></div>' +
           '<div class="muted">лучший результат ' + r.best + ' м · ' + HC.fmtTime(r.time) + '</div></div>' +
-          '<div class="stat"><span>монеты на трассе</span><b>' + money(r.coinsRaw) + '</b></div>' +
-          '<div class="stat"><span>за расстояние</span><b>' + money(r.distCoins) + '</b></div>' +
-          (r.bonus ? '<div class="stat"><span>бонус за рекорд</span><b>' + money(r.bonus) + '</b></div>' : '') +
-          (r.flips ? '<div class="stat"><span>сальто</span><b>' + r.flips + '</b></div>' : '') +
-          (r.cans ? '<div class="stat"><span>канистр подобрано</span><b>' + r.cans + '</b></div>' : '') +
-          (r.ore ? '<div class="stat"><span>руда</span><b>' + money(r.ore) + '</b></div>' : '') +
-          '<div class="stat total"><span>всего монет</span><b>' + money(r.total) + '</b></div>' +
+          '<div class="stat"><span>' + ic('coin', 'sm') + 'монеты на трассе</span><b>' + money(r.coinsRaw) + '</b></div>' +
+          '<div class="stat"><span>' + ic('road', 'sm') + 'за расстояние</span><b>' + money(r.distCoins) + '</b></div>' +
+          (r.bonus ? '<div class="stat"><span>' + ic('trophy', 'sm') + 'бонус за рекорд</span><b>' + money(r.bonus) + '</b></div>' : '') +
+          (r.flips ? '<div class="stat"><span>' + ic('flip', 'sm') + 'сальто</span><b>' + r.flips + '</b></div>' : '') +
+          (r.cans ? '<div class="stat"><span>' + ic('fuel', 'sm') + 'канистр подобрано</span><b>' + r.cans + '</b></div>' : '') +
+          (r.ore ? '<div class="stat"><span>' + ic('ore', 'sm') + 'руда</span><b>' + money(r.ore) + '</b></div>' : '') +
+          '<div class="stat total"><span>' + ic('coin') + 'всего монет</span><b>' + money(r.total) + '</b></div>' +
           '<div class="row"><button class="btn main wide" data-again>Ещё заезд</button>' +
           '<button class="btn wide" data-home>На базу</button></div>';
         return {
@@ -510,38 +526,58 @@ window.HC = window.HC || {};
     },
 
     /* --- Задания ------------------------------------------ */
+    questTab: 'daily',
+
     openQuests: function () {
       this.open(function () {
         HC.Quests.ensure(G.state);
-        var html = '<p class="lead">Списки обновляются сами. Ничего не пропадёт, ' +
-          'если зайти позже — но незабранная награда исчезает вместе со старым списком.</p>';
+        var period = UI.questTab;
+        if (!HC.QUEST_PERIODS[period]) period = UI.questTab = 'daily';
+        var P = HC.QUEST_PERIODS[period];
+        var group = G.state.quests[period];
 
-        Object.keys(HC.QUEST_PERIODS).forEach(function (period) {
-          var P = HC.QUEST_PERIODS[period];
-          var group = G.state.quests[period];
-          if (!group) return;
-          html += '<h4 class="sec">' + P.name + ' <em>· обновится через ' +
-                  HC.fmtTime(HC.Quests.resetIn(period)) + '</em></h4>';
+        // вкладки: сразу видно, где ждёт награда
+        var html = '<div class="tabs">';
+        Object.keys(HC.QUEST_PERIODS).forEach(function (p) {
+          var list = (G.state.quests[p] && G.state.quests[p].list) || [];
+          var ready = list.filter(function (q) { return !q.c && HC.Quests.done(q); }).length;
+          html += '<button data-tab="' + p + '" class="' + (p === period ? 'on' : '') + '">' +
+                  HC.QUEST_PERIODS[p].tab +
+                  (ready ? '<span class="tab-n">' + ready + '</span>' : '') + '</button>';
+        });
+        html += '</div>';
+
+        html += '<p class="tab-note">' + ic('clock', 'sm') + 'Список обновится через ' +
+                HC.fmtTime(HC.Quests.resetIn(period)) + '. Незабранная награда уйдёт вместе с ним.</p>';
+
+        if (group) {
           group.list.forEach(function (q, i) {
             var done = HC.Quests.done(q);
             var pct = Math.min(100, Math.round(q.p / q.n * 100));
-            var reward = '<span class="price"><i class="ic coin"></i>' + money(q.rc) +
-                         (q.ro ? '<i class="ic ore"></i>' + money(q.ro) : '') + '</span>';
+            var reward = '<span class="price">' + ic('coin') + money(q.rc) +
+                         (q.ro ? ic('ore') + money(q.ro) : '') + '</span>';
             html += '<div class="card quest' + (q.c ? ' claimed' : (done ? ' ready' : '')) + '">' +
-              '<div class="card-main"><h3>' + HC.Quests.text(q) + '</h3>' +
+              '<div class="card-main"><h3>' + ic(QUEST_ICON[q.t] || 'flag') + HC.Quests.text(q) + '</h3>' +
               '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
               '<p class="muted">' + HC.Quests.progressText(q) + '</p></div>' +
               '<div class="card-side">' +
-              (q.c ? '<span class="done">получено</span>'
+              (q.c ? '<span class="done">' + ic('check', 'sm') + ' получено</span>'
                    : done ? '<button class="btn main" data-claim="' + period + ':' + i + '">Забрать</button>'
                           : reward) +
               '</div></div>';
           });
-        });
+        }
 
         return {
-          title: 'Задания', html: html,
+          title: 'Задания · ' + P.name.toLowerCase(), html: html,
           bind: function (root) {
+            root.querySelectorAll('[data-tab]').forEach(function (b) {
+              b.addEventListener('click', function () {
+                UI.questTab = b.getAttribute('data-tab');
+                HC.Audio.click();
+                UI.render();
+              });
+            });
             root.querySelectorAll('[data-claim]').forEach(function (b) {
               b.addEventListener('click', function () {
                 var parts = b.getAttribute('data-claim').split(':');
@@ -564,28 +600,28 @@ window.HC = window.HC || {};
         var s = G.state, st = s.stats, set = s.settings;
         var r = HC.Economy.rates(s), cap = HC.Economy.capacity(s);
         var html =
-          '<h4 class="sec">Звук</h4>' +
+          '<h4 class="sec">' + ic('sound') + 'Звук</h4>' +
           '<label class="row switch"><span>Музыка</span><input type="checkbox" id="set-music" ' + (set.music ? 'checked' : '') + '></label>' +
           '<label class="row slider"><span>Громкость</span><input type="range" id="set-mvol" min="0" max="100" value="' + Math.round(set.musicVol * 100) + '"></label>' +
           '<label class="row switch"><span>Звуки</span><input type="checkbox" id="set-sfx" ' + (set.sfx ? 'checked' : '') + '></label>' +
           '<label class="row slider"><span>Громкость</span><input type="range" id="set-svol" min="0" max="100" value="' + Math.round(set.sfxVol * 100) + '"></label>' +
 
-          '<h4 class="sec">Вид</h4>' +
+          '<h4 class="sec">' + ic('settings') + 'Вид</h4>' +
           '<label class="row switch"><span>Тёмная тема</span><input type="checkbox" id="set-theme" ' + (set.theme === 'dark' ? 'checked' : '') + '></label>' +
           '<label class="row switch"><span>Спокойный режим <em>(без пыли и тряски)</em></span><input type="checkbox" id="set-calm" ' + (set.calmMode ? 'checked' : '') + '></label>' +
 
-          '<h4 class="sec">Добыча</h4>' +
-          '<div class="stat"><span>монет в минуту</span><b>' + HC.fmt1(r.coins) + '</b></div>' +
-          '<div class="stat"><span>руды в минуту</span><b>' + HC.fmt1(r.ore) + '</b></div>' +
-          '<div class="stat"><span>склад</span><b>' + money(cap.coins) + ' / ' + money(cap.ore) + '</b></div>' +
-          '<div class="stat"><span>копилка офлайна</span><b>' + HC.fmt1(HC.Economy.offlineHours(s)) + ' ч</b></div>' +
+          '<h4 class="sec">' + ic('mine') + 'Добыча</h4>' +
+          '<div class="stat"><span>' + ic('coin', 'sm') + 'монет в минуту</span><b>' + HC.fmt1(r.coins) + '</b></div>' +
+          '<div class="stat"><span>' + ic('ore', 'sm') + 'руды в минуту</span><b>' + HC.fmt1(r.ore) + '</b></div>' +
+          '<div class="stat"><span>' + ic('storage', 'sm') + 'склад</span><b>' + money(cap.coins) + ' / ' + money(cap.ore) + '</b></div>' +
+          '<div class="stat"><span>' + ic('clock', 'sm') + 'копилка офлайна</span><b>' + HC.fmt1(HC.Economy.offlineHours(s)) + ' ч</b></div>' +
 
-          '<h4 class="sec">Пройдено</h4>' +
-          '<div class="stat"><span>заездов</span><b>' + st.runs + '</b></div>' +
-          '<div class="stat"><span>всего метров</span><b>' + money(st.totalDistance) + '</b></div>' +
-          '<div class="stat"><span>всего монет заработано</span><b>' + money(st.totalCoins) + '</b></div>' +
+          '<h4 class="sec">' + ic('chart') + 'Пройдено</h4>' +
+          '<div class="stat"><span>' + ic('repeat', 'sm') + 'заездов</span><b>' + st.runs + '</b></div>' +
+          '<div class="stat"><span>' + ic('road', 'sm') + 'всего метров</span><b>' + money(st.totalDistance) + '</b></div>' +
+          '<div class="stat"><span>' + ic('coin', 'sm') + 'всего монет заработано</span><b>' + money(st.totalCoins) + '</b></div>' +
 
-          '<h4 class="sec">Песочница <em>для проверки</em></h4>' +
+          '<h4 class="sec">' + ic('beaker') + 'Песочница <em>для проверки</em></h4>' +
           '<p class="muted">Выдать себе ресурсы и всё открыть, чтобы посмотреть игру целиком. ' +
           'Игра только твоя и офлайновая, так что портить тут нечего — но если хочешь честный ' +
           'прогресс, сначала сохранись в файл.</p>' +
@@ -605,7 +641,7 @@ window.HC = window.HC || {};
           '<button class="btn ghost" data-cheat="poor">Обнулить ресурсы</button>' +
           '</div>' +
 
-          '<h4 class="sec">Сохранение</h4>' +
+          '<h4 class="sec">' + ic('save') + 'Сохранение</h4>' +
           '<p class="muted">Игра сама пишется в память браузера каждые несколько секунд. ' +
           (HC.isMemoryOnly() ? '<b>Сейчас автосохранение недоступно</b> — браузер запретил запись. Сохраняйся в файл.' :
            'Чтобы не потерять прогресс при чистке браузера — выгружай файл или код.') + '</p>' +
