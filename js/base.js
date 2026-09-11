@@ -91,8 +91,19 @@ window.HC = window.HC || {};
 
   /* ========== Сцена базы ================================== */
   /* Линии земли: нижняя терраса (ближе к зрителю) и верхняя. */
-  function lowerY(x) { return 576 + HC.noise(x * 0.0040 + 3, 21) * 12; }
-  function upperY(x) { return 412 + HC.noise(x * 0.0035 + 5, 44) * 9; }
+  /* Три плана долины. Дальний выше на экране и мельче — так появляется
+     глубина, которой не было у двух плоских полок. */
+  var ROWS = [
+    { base: 600, wob: 12, seed: 21, scale: 1.00, x0: -320, x1: VW + 320, round: false, fade: 0.00 },
+    { base: 452, wob: 10, seed: 44, scale: 0.80, x0: 24,   x1: VW - 24,  round: true,  fade: 0.16 },
+    { base: 322, wob: 8,  seed: 63, scale: 0.60, x0: 96,   x1: VW - 96,  round: true,  fade: 0.34 }
+  ];
+
+  function rowY(row, x) {
+    var R = ROWS[row] || ROWS[0];
+    return R.base + HC.noise(x * 0.0040 + 3 + row * 2.5, R.seed) * R.wob;
+  }
+  function lowerY(x) { return rowY(0, x); }
 
   var Base = {
     pan: 0, scale: 1, padX: 0, padY: 0, t: 0,
@@ -103,20 +114,47 @@ window.HC = window.HC || {};
     places: function () {
       if (!this.spots) {
         this.spots = HC.PLOTS.spots.map(function (s) {
-          return { x: s.x, y: s.row ? upperY(s.x) : lowerY(s.x), row: s.row };
+          var row = Math.min(2, s.row || 0);
+          return { x: s.x, y: rowY(row, s.x), row: row, scale: ROWS[row].scale };
         });
       }
       return this.spots;
     },
 
     layout: function (W, H) {
-      this.scale = clamp(Math.min(H / VH, W / 680), 0.25, 2.4);
+      // Подгоняем не всё поле 1280x720, а полосу, где реально что-то есть
+      // (от дальних гряд до переднего плана) — иначе полэкрана уходит в небо.
+      var BAND_TOP = 60, BAND_H = 660;
+      this.scale = clamp(Math.min(H / BAND_H, W / 620), 0.30, 2.6);
       var vw = W / this.scale;
-      if (vw >= VW) { this.pan = (VW - vw) / 2; this.padX = 0; }
+
+      // Стартуем чуть левее центра: первые участки стоят слева, и на
+      // узком экране игрок сразу видит их, а не одни ворота справа.
+      if (this.panInit === undefined) {
+        this.pan = clamp((VW - vw) / 2 - 70, 0, Math.max(0, VW - vw));
+        this.panInit = 1;
+      }
+      if (vw >= VW) this.pan = (VW - vw) / 2;
       else this.pan = clamp(this.pan, 0, VW - vw);
+
+      // Панели сверху и снизу занимают часть кадра. Центруем долину между
+      // ними, а не по всему экрану: на телефоне иначе половина — пустое небо.
+      if (this.insW !== W || this.insH !== H || !this.insOK) {
+        this.insW = W; this.insH = H; this.insOK = 1;
+        this.insT = 64; this.insB = 96;
+        var barEl = document.getElementById('base-bar');
+        var topEl = document.getElementById('top');
+        // Панель может быть спрятана (например, в момент перехода) — тогда
+        // высота 0, и мерить нечего: оставляем запас и пробуем в следующий раз.
+        var bh = barEl ? barEl.getBoundingClientRect().height : 0;
+        var th = topEl ? topEl.getBoundingClientRect().height : 0;
+        if (bh > 10) this.insB = Math.min(H * 0.42, bh + 18); else this.insOK = 0;
+        if (th > 10) this.insT = Math.min(H * 0.3, th + 14); else this.insOK = 0;
+      }
+      var avail = Math.max(200, H - this.insT - this.insB);
+
       this.padX = 0;
-      // прижимаем долину к низу, лишнее место отдаём небу
-      this.padY = Math.max(0, (H - VH * this.scale) * 0.80);
+      this.padY = this.insT + (avail - BAND_H * this.scale) * 0.5 - BAND_TOP * this.scale;
     },
 
     toVirtual: function (sx, sy) {
@@ -130,8 +168,9 @@ window.HC = window.HC || {};
       var best = -1, bestD = 1e9;
       for (var i = 0; i < state.base.unlocked && i < spots.length; i++) {
         var s = spots[i];
-        var d = Math.hypot(v.x - s.x, v.y - (s.y - 45));
-        if (d < 80 && d < bestD) { bestD = d; best = i; }
+        var sc = s.scale || 1;
+        var d = Math.hypot(v.x - s.x, v.y - (s.y - 45 * sc));
+        if (d < 80 * sc && d < bestD) { bestD = d; best = i; }
       }
       return best;
     },
@@ -153,184 +192,280 @@ window.HC = window.HC || {};
       g.scale(this.scale, this.scale);
       g.translate(-this.pan, 0);
 
-      this.drawValley(g, P);
-      this.drawDecor(g, P);
-      this.drawPath(g, P, state);
+      this.drawBackdrop(g, P);
 
-      // участки: сначала дальний ярус, потом ближний — чтобы дома не налезали
+      // От дальнего плана к ближнему. Между планами — дымка: дальнее
+      // выцветает к небу, и долина читается вглубь, а не одной полкой.
       var spots = this.places();
-      var order = [];
-      for (var i = 0; i < spots.length; i++) order.push(i);
-      order.sort(function (a, b2) { return spots[b2].row - spots[a].row; });
-      for (var k = 0; k < order.length; k++) {
-        var i2 = order[k], s = spots[i2];
-        if (i2 >= state.base.unlocked) continue;
-        var plot = state.base.plots[i2];
-        if (plot) this.drawBuilding(g, plot.type, plot.level, s, P);
-        else this.drawEmpty(g, s, P);
+      for (var row = ROWS.length - 1; row >= 0; row--) {
+        this.terrace(g, P, row);
+        if (row === 2) this.drawPipes(g, P);
+        if (row === 1) this.drawRails(g, P);
+        if (row === 0) this.drawPath(g, P, state);
+        this.drawDecorRow(g, P, row);
+        this.drawPlotsRow(g, P, state, row, spots);
+        if (row === 1) this.drawTrolley(g, P);
+        if (row === 1) this.drawRopeway(g, P);
+        if (row === 0) { this.drawFence(g, P); this.drawSign(g, P); }
+        if (row > 0) this.haze(g, P, row);
       }
-      if (state.base.unlocked < spots.length) {
-        this.drawLocked(g, spots[state.base.unlocked], P);
-      }
-
+      this.drawRamps(g, P);
       this.drawParked(g, P, state);
+      this.drawForeground(g, P);
       g.restore();
 
       HC.drawVignette(g, W, H, P);
     },
 
-    drawValley: function (g, P) {
+    drawBackdrop: function (g, P) {
       var x;
-      // дальние гряды
+      // дальние гряды за долиной
       g.fillStyle = P.far0;
       g.beginPath(); g.moveTo(-300, VH);
       for (x = -300; x <= VW + 300; x += 20) {
-        g.lineTo(x, 250 + HC.noise(x * 0.0022, 31) * 62 + HC.noise(x * 0.007, 12) * 20);
+        g.lineTo(x, 176 + HC.noise(x * 0.0022, 31) * 46 + HC.noise(x * 0.007, 12) * 15);
       }
       g.lineTo(VW + 300, VH); g.closePath(); g.fill();
 
       g.fillStyle = P.far1;
       g.beginPath(); g.moveTo(-300, VH);
       for (x = -300; x <= VW + 300; x += 20) {
-        g.lineTo(x, 330 + HC.noise(x * 0.0031 + 9, 77) * 52 + HC.noise(x * 0.009, 5) * 14);
+        g.lineTo(x, 236 + HC.noise(x * 0.0031 + 9, 77) * 38 + HC.noise(x * 0.009, 5) * 12);
       }
       g.lineTo(VW + 300, VH); g.closePath(); g.fill();
 
-      // верхняя терраса — плато с обрывами по краям
-      this.terrace(g, P, upperY, 40, VW - 40, true);
-      // нижняя терраса — во всю ширину
-      this.terrace(g, P, lowerY, -300, VW + 300, false);
     },
 
-    /* Один уступ долины: заливка, край и штриховка под ним. */
-    terrace: function (g, P, fn, x0, x1, rounded) {
-      var x;
+    /* Дымка поверх дальнего плана: он выцветает к небу */
+    haze: function (g, P, row) {
+      var line = rowY(row - 1, VW / 2) + 10;
       g.save();
-      var tg = g.createLinearGradient(0, fn(x0) - 20, 0, VH + 200);
+      g.globalAlpha = 0.20 + (row - 1) * 0.10;
+      g.fillStyle = P.sky1;
+      g.fillRect(-400, -300, VW + 800, line + 300);
+      g.restore();
+      g.globalAlpha = 1;
+    },
+
+    /* Постройки одного плана */
+    drawPlotsRow: function (g, P, state, row, spots) {
+      for (var i = 0; i < spots.length; i++) {
+        if (spots[i].row !== row) continue;
+        if (i >= state.base.unlocked) {
+          if (i === state.base.unlocked) this.drawLocked(g, spots[i], P);
+          continue;
+        }
+        var plot = state.base.plots[i];
+        if (plot) this.drawBuilding(g, plot.type, plot.level, spots[i], P);
+        else this.drawEmpty(g, spots[i], P);
+      }
+    },
+
+    /* Один уступ: площадка, освещённая кромка и стенка с камнем.
+       Стенка и даёт ощущение толщины — без неё это была плоская полка. */
+    terrace: function (g, P, row) {
+      var R = ROWS[row], x;
+      function fn(v) { return rowY(row, v); }
+
+      g.save();
+      // короткий градиент: план заметно темнеет к своему низу, и полки
+      // перестают выглядеть одинаково плоскими
+      var tg = g.createLinearGradient(0, R.base - 10, 0, R.base + 200);
       tg.addColorStop(0, P.ground);
       tg.addColorStop(1, P.groundDeep || P.ground);
       g.fillStyle = tg;
       g.beginPath();
-      g.moveTo(x0, VH + 900);
-      if (rounded) g.lineTo(x0 + 26, fn(x0 + 26) + 10);
-      for (x = x0; x <= x1; x += 14) g.lineTo(x, fn(x));
-      if (rounded) g.lineTo(x1 - 26, fn(x1 - 26) + 10);
-      g.lineTo(x1, VH + 900);
+      g.moveTo(R.x0, VH + 900);
+      if (R.round) g.lineTo(R.x0 + 30, fn(R.x0 + 30) + 16);
+      for (x = R.x0; x <= R.x1; x += 14) g.lineTo(x, fn(x));
+      if (R.round) g.lineTo(R.x1 - 30, fn(R.x1 - 30) + 16);
+      g.lineTo(R.x1, VH + 900);
       g.closePath();
       g.fill();
 
       g.save();
       g.clip();
 
-      // освещённая полоса под кромкой — уступ получает толщину
+      // освещённая кромка
       g.strokeStyle = P.groundTop || P.ground;
       g.globalAlpha = 0.95;
       g.lineWidth = 9;
       g.lineJoin = 'round';
       g.beginPath();
-      for (x = x0; x <= x1; x += 14) {
-        if (x === x0) g.moveTo(x, fn(x)); else g.lineTo(x, fn(x));
-      }
+      for (x = R.x0; x <= R.x1; x += 14) { if (x === R.x0) g.moveTo(x, fn(x)); else g.lineTo(x, fn(x)); }
       g.stroke();
       g.globalAlpha = 1;
 
-      // штриховка
+      // стенка уступа
+      var wallH = 58;
+      var wg = g.createLinearGradient(0, R.base + 9, 0, R.base + 9 + wallH);
+      wg.addColorStop(0, P.groundDeep || P.ground);
+      wg.addColorStop(0.55, P.groundDeep || P.ground);
+      wg.addColorStop(1, 'rgba(0,0,0,0)');
+      g.globalAlpha = 0.8;
+      g.fillStyle = wg;
+      g.beginPath();
+      for (x = R.x0; x <= R.x1; x += 14) { if (x === R.x0) g.moveTo(x, fn(x) + 10); else g.lineTo(x, fn(x) + 10); }
+      for (x = R.x1; x >= R.x0; x -= 14) g.lineTo(x, fn(x) + 10 + wallH);
+      g.closePath();
+      g.fill();
+      g.globalAlpha = 1;
+
+      // камень в стенке
       g.strokeStyle = P.hatch;
-      g.globalAlpha = 0.26;
+      g.globalAlpha = 0.28;
       g.lineWidth = 1;
       g.beginPath();
-      for (x = x0; x < x1; x += 36) {
-        g.moveTo(x, fn(x) + 13);
-        g.lineTo(x - 13, fn(x) + 47);
+      for (x = R.x0; x < R.x1; x += 30) {
+        var y0 = fn(x) + 16;
+        g.moveTo(x, y0); g.lineTo(x - 11, y0 + 28);
+        g.moveTo(x - 16, y0 + 9); g.lineTo(x + 12, y0 + 5);
       }
       g.stroke();
       g.globalAlpha = 1;
       g.restore();
 
-      // кромка
+      // кромка чернилами; дальние планы бледнее
       g.strokeStyle = P.ink;
-      g.lineWidth = 2.4;
+      g.globalAlpha = 1 - R.fade * 1.5;
+      g.lineWidth = 2.4 * (0.7 + R.scale * 0.3);
       g.lineJoin = 'round';
       g.beginPath();
-      for (x = x0; x <= x1; x += 14) {
-        if (x === x0) g.moveTo(x, fn(x)); else g.lineTo(x, fn(x));
-      }
+      for (x = R.x0; x <= R.x1; x += 14) { if (x === R.x0) g.moveTo(x, fn(x)); else g.lineTo(x, fn(x)); }
       g.stroke();
+      g.globalAlpha = 1;
       g.restore();
     },
 
-    /* Деревья и камни по краям долины — чтобы это было место, а не полка */
-    drawDecor: function (g, P) {
-      var self = this;
-      // обстановка базы: фонари вдоль дороги, башня, ящики, флагшток.
-      // Расставлено по промежуткам между участками, чтобы ничего не налезало.
+    /* Лестницы на стенках уступов: в виде сбоку пандус читается плитой,
+       а ступени сразу говорят «сюда можно подняться». */
+    drawRamps: function (g, P) {
+      function stairs(x, row, steps) {
+        var y = rowY(row, x);
+        g.save();
+        g.strokeStyle = P.ink;
+        g.globalAlpha = 0.45;
+        g.lineWidth = 2;
+        g.lineJoin = 'round';
+        g.beginPath();
+        var sw = 9, sh = 7;
+        g.moveTo(x, y + 6);
+        for (var i = 0; i < steps; i++) {
+          g.lineTo(x + (i + 1) * sw, y + 6 + i * sh);
+          g.lineTo(x + (i + 1) * sw, y + 6 + (i + 1) * sh);
+        }
+        g.stroke();
+        // перила
+        g.globalAlpha = 0.3;
+        g.lineWidth = 1.5;
+        g.beginPath();
+        g.moveTo(x, y - 6);
+        g.lineTo(x + steps * sw, y + 6 + steps * sh - 14);
+        g.stroke();
+        g.restore();
+        g.globalAlpha = 1;
+      }
+      stairs(1196, 1, 7);
+      stairs(64, 2, 7);
+    },
+
+    /* Трубопровод на опорах вдоль дальнего плана */
+    drawPipes: function (g, P) {
+      g.save();
+      g.strokeStyle = P.ink;
+      g.globalAlpha = 0.4;
+      g.lineWidth = 4.5;
+      g.beginPath();
+      for (var x = 120; x <= VW - 120; x += 16) {
+        if (x === 120) g.moveTo(x, rowY(2, x) - 24); else g.lineTo(x, rowY(2, x) - 24);
+      }
+      g.stroke();
+      g.lineWidth = 2;
+      for (var sx = 150; sx < VW - 120; sx += 130) {
+        g.beginPath();
+        g.moveTo(sx, rowY(2, sx) - 22); g.lineTo(sx, rowY(2, sx));
+        g.moveTo(sx - 7, rowY(2, sx)); g.lineTo(sx + 7, rowY(2, sx));
+        g.stroke();
+      }
+      g.restore();
+      g.globalAlpha = 1;
+    },
+
+    /* Обстановка одного плана */
+    drawDecorRow: function (g, P, row) {
       var items = [
-        { x: 232, row: 0, t: 'lamp', s: 1 },    { x: 420, row: 0, t: 'crates', s: 1 },
-        { x: 612, row: 0, t: 'lamp', s: 1 },    { x: 800, row: 0, t: 'rock', s: 0.85 },
-        { x: 1100, row: 0, t: 'lamp', s: 1 },   { x: 60, row: 0, t: 'grass', s: 1.1 },
-        { x: 70,  row: 1, t: 'tower', s: 1 },   { x: 272, row: 1, t: 'crates', s: 0.9 },
-        { x: 448, row: 1, t: 'grass', s: 1.1 }, { x: 614, row: 1, t: 'bush', s: 0.95 },
-        { x: 786, row: 1, t: 'grass', s: 1 },   { x: 952, row: 1, t: 'flagpole', s: 1 },
-        { x: 1142, row: 1, t: 'tree', s: 1 },   { x: 1238, row: 1, t: 'pine', s: 1.15 }
+        { x: 90,   row: 0, t: 'crates', s: 1 },   { x: 390, row: 0, t: 'lamp', s: 1 },
+        { x: 600,  row: 0, t: 'lamp', s: 1 },     { x: 680, row: 1, t: 'lamp', s: 1 },
+        { x: 210,  row: 0, t: 'grass', s: 1.1 },  { x: 770, row: 0, t: 'bush', s: 1 },
+        { x: 1150, row: 0, t: 'grass', s: 1 },
+        { x: 120,  row: 1, t: 'tower', s: 1 },    { x: 490, row: 1, t: 'crates', s: 0.95 },
+        { x: 870,  row: 1, t: 'flagpole', s: 1 }, { x: 1120, row: 1, t: 'grass', s: 1.1 },
+        { x: 1230, row: 1, t: 'tree', s: 1 },
+        { x: 150,  row: 2, t: 'pine', s: 1.05 },  { x: 425, row: 2, t: 'rock', s: 0.85 },
+        { x: 615,  row: 2, t: 'bush', s: 0.95 },  { x: 810, row: 2, t: 'grass', s: 1 },
+        { x: 1060, row: 2, t: 'tree', s: 1 }
       ];
-      // ограда по переднему краю: база становится огороженной территорией
+      var R = ROWS[row];
+      items.forEach(function (d) {
+        if ((d.row || 0) !== row) return;
+        g.save();
+        g.globalAlpha = 1 - R.fade;
+        g.translate(d.x, rowY(row, d.x));
+        g.scale(R.scale, R.scale);
+        HC.Decor.shadow(g, P, 14 * d.s, 0.2);
+        HC.Decor.draw(g, d.t, P, d.s, d.x % 2 === 0);
+        g.restore();
+        g.globalAlpha = 1;
+      });
+    },
+
+    /* Ограда по переднему краю базы */
+    drawFence: function (g, P) {
       g.save();
       g.strokeStyle = P.ink;
       g.globalAlpha = 0.55;
       g.lineWidth = 2;
       g.lineCap = 'round';
       for (var fx = 8; fx < 1272; fx += 26) {
-        if (fx > 1152 && fx < 1278) continue;        // проём под ворота
+        if (fx > 1104 && fx < 1244) continue;
         var fy = lowerY(fx) + 40;
         g.beginPath(); g.moveTo(fx, fy); g.lineTo(fx, fy - 20); g.stroke();
       }
       g.lineWidth = 1.7;
-      g.beginPath();
-      for (var fx2 = 8; fx2 < 1272; fx2 += 13) {
-        if (fx2 > 1152 && fx2 < 1278) { g.moveTo(fx2, lowerY(fx2) + 26); continue; }
-        g.lineTo(fx2, lowerY(fx2) + 26);
-      }
-      g.stroke();
-      g.beginPath();
-      for (var fx3 = 8; fx3 < 1272; fx3 += 13) {
-        if (fx3 > 1152 && fx3 < 1278) { g.moveTo(fx3, lowerY(fx3) + 34); continue; }
-        g.lineTo(fx3, lowerY(fx3) + 34);
-      }
-      g.stroke();
-      g.restore();
-      g.globalAlpha = 1;
-
-      // узкоколейка вдоль верхнего яруса — она связывает шахты
-      g.save();
-      g.strokeStyle = P.ink;
-      g.globalAlpha = 0.4;
-      g.lineWidth = 1.6;
-      for (var rx = 40; rx < 1240; rx += 14) {
-        g.beginPath(); g.moveTo(rx, upperY(rx) + 12); g.lineTo(rx, upperY(rx) + 18); g.stroke();
-      }
-      g.lineWidth = 1.8;
-      [13, 17].forEach(function (off) {
+      [26, 34].forEach(function (off) {
         g.beginPath();
-        for (var rx2 = 40; rx2 <= 1240; rx2 += 14) g.lineTo(rx2, upperY(rx2) + off);
+        for (var fx2 = 8; fx2 < 1272; fx2 += 13) {
+          if (fx2 > 1104 && fx2 < 1244) { g.moveTo(fx2, lowerY(fx2) + off); continue; }
+          g.lineTo(fx2, lowerY(fx2) + off);
+        }
         g.stroke();
       });
       g.restore();
       g.globalAlpha = 1;
+    },
 
-      items.forEach(function (d) {
-        var y = d.row ? upperY(d.x) : lowerY(d.x);
-        g.save();
-        g.translate(d.x, y);
-        HC.Decor.shadow(g, P, 14 * d.s, 0.2);
-        HC.Decor.draw(g, d.t, P, d.s, d.x % 2 === 0);
-        g.restore();
+    /* Узкоколейка вдоль среднего плана */
+    drawRails: function (g, P) {
+      g.save();
+      g.strokeStyle = P.ink;
+      g.globalAlpha = 0.4;
+      g.lineWidth = 1.6;
+      for (var rx = 60; rx < 1220; rx += 14) {
+        g.beginPath(); g.moveTo(rx, rowY(1, rx) + 12); g.lineTo(rx, rowY(1, rx) + 18); g.stroke();
+      }
+      g.lineWidth = 1.8;
+      [13, 17].forEach(function (off) {
+        g.beginPath();
+        for (var rx2 = 60; rx2 <= 1220; rx2 += 14) g.lineTo(rx2, rowY(1, rx2) + off);
+        g.stroke();
       });
-      self.drawSign(g, P);
+      g.restore();
+      g.globalAlpha = 1;
     },
 
     /* Ворота с вывеской на въезде */
     drawSign: function (g, P) {
-      var x = 1214, y = lowerY(x);
+      var x = 1160, y = lowerY(x);
       g.save();
       g.translate(x, y);
       // столбы ворот
@@ -385,7 +520,7 @@ window.HC = window.HC || {};
     drawParked: function (g, P, state) {
       var def = HC.VEHICLES[state.vehicle];
       if (!def) return;
-      var x = 995, y = lowerY(x) + 4;
+      var x = 1040, y = lowerY(x) + 4;
       g.save();
       g.translate(x, y);
       g.scale(0.82, 0.82);
@@ -406,9 +541,269 @@ window.HC = window.HC || {};
       g.restore();
     },
 
+    /* Вагонетка катится по узкоколейке туда и обратно. Единственное,
+       что на базе само куда-то едет — и долина сразу живая. */
+    drawTrolley: function (g, P) {
+      var span = 1120, R = ROWS[1];
+      var x = 60 + ((this.t * 24) % (span * 2));
+      var back = x > 60 + span;
+      if (back) x = 120 + span * 2 - x;
+      var y = rowY(1, x) + 15;
+      g.save();
+      g.globalAlpha = 1 - R.fade;
+      g.translate(x, y);
+      g.scale(back ? -R.scale : R.scale, R.scale);
+      g.strokeStyle = P.ink;
+      g.lineWidth = 2;
+      g.lineJoin = 'round';
+      // руда горкой
+      g.fillStyle = P.hatch;
+      g.beginPath();
+      g.moveTo(-11, -20); g.quadraticCurveTo(-4, -29, 2, -23);
+      g.quadraticCurveTo(7, -29, 11, -20);
+      g.closePath(); g.fill();
+      // кузов
+      var bg = g.createLinearGradient(0, -21, 0, -5);
+      bg.addColorStop(0, P.bodyHi || P.bodyFill);
+      bg.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = bg;
+      g.beginPath();
+      g.moveTo(-15, -21); g.lineTo(15, -21); g.lineTo(12, -5); g.lineTo(-12, -5);
+      g.closePath(); g.fill(); g.stroke();
+      g.globalAlpha = (1 - R.fade) * 0.5;
+      g.lineWidth = 1.4;
+      g.beginPath(); g.moveTo(-8, -20); g.lineTo(-7, -6); g.moveTo(8, -20); g.lineTo(7, -6); g.stroke();
+      g.globalAlpha = 1 - R.fade;
+      // колёса
+      g.lineWidth = 1.8;
+      g.fillStyle = P.bodyShade || P.bodyFill;
+      [-8, 8].forEach(function (wx) {
+        g.beginPath(); g.arc(wx, -2, 3.6, 0, 6.3); g.fill(); g.stroke();
+      });
+      g.restore();
+      g.globalAlpha = 1;
+    },
+
+    /* Канатка над долиной: две опоры, провисающий трос и вагонетки.
+       Она занимает пустое небо и связывает планы между собой. */
+    drawRopeway: function (g, P) {
+      var R = ROWS[1], i;
+      var x0 = 210, x1 = 1070;
+      var y0 = rowY(1, x0), y1 = rowY(1, x1);
+      var top0 = y0 - 205, top1 = y1 - 205, sag = 30;
+      function wy(u) { return top0 + (top1 - top0) * u + sag * 4 * u * (1 - u); }
+      function wx(u) { return x0 + (x1 - x0) * u; }
+
+      g.save();
+      g.globalAlpha = 1 - R.fade;
+      g.strokeStyle = P.ink;
+      g.lineJoin = 'round';
+      g.lineCap = 'round';
+
+      // опоры: ажурная мачта с раскосами
+      [[x0, y0], [x1, y1]].forEach(function (t) {
+        var tx = t[0], ty = t[1], h = 205, w = 19;
+        g.lineWidth = 2.6;
+        g.beginPath();
+        g.moveTo(tx - w, ty); g.lineTo(tx - 6, ty - h);
+        g.moveTo(tx + w, ty); g.lineTo(tx + 6, ty - h);
+        g.stroke();
+        g.lineWidth = 1.4;
+        g.globalAlpha = (1 - R.fade) * 0.6;
+        g.beginPath();
+        for (var k = 0; k < 7; k++) {
+          var ya = ty - h * k / 7, yb = ty - h * (k + 1) / 7;
+          var wa = w - (w - 6) * k / 7, wb = w - (w - 6) * (k + 1) / 7;
+          g.moveTo(tx - wa, ya); g.lineTo(tx + wb, yb);
+          g.moveTo(tx + wa, ya); g.lineTo(tx - wb, yb);
+          g.moveTo(tx - wb, yb); g.lineTo(tx + wb, yb);
+        }
+        g.stroke();
+        g.globalAlpha = 1 - R.fade;
+        // головка с роликом
+        g.lineWidth = 2.4;
+        g.beginPath();
+        g.moveTo(tx - 13, ty - h); g.lineTo(tx + 13, ty - h);
+        g.stroke();
+        g.fillStyle = P.bodyHi || P.bodyFill;
+        g.beginPath(); g.arc(tx, ty - h - 5, 5, 0, 6.3); g.fill(); g.stroke();
+      });
+
+      // трос
+      g.lineWidth = 2;
+      g.globalAlpha = (1 - R.fade) * 0.8;
+      g.beginPath();
+      for (i = 0; i <= 40; i++) {
+        var u = i / 40;
+        if (i === 0) g.moveTo(wx(u), wy(u)); else g.lineTo(wx(u), wy(u));
+      }
+      g.stroke();
+      // обратная ветвь
+      g.globalAlpha = (1 - R.fade) * 0.35;
+      g.lineWidth = 1.4;
+      g.beginPath();
+      for (i = 0; i <= 40; i++) {
+        var u2 = i / 40;
+        if (i === 0) g.moveTo(wx(u2), wy(u2) + 13); else g.lineTo(wx(u2), wy(u2) + 13);
+      }
+      g.stroke();
+      g.globalAlpha = 1 - R.fade;
+
+      // вагонетки навстречу друг другу
+      var ph = (this.t * 0.035) % 1;
+      [ph, (ph + 0.5) % 1].forEach(function (u, n) {
+        var cx = wx(u), cy = wy(u) + (n ? 13 : 0);
+        var tilt = Math.sin(u * 3.14159) * 0.02 * (n ? -1 : 1);
+        g.save();
+        g.translate(cx, cy);
+        g.rotate(tilt);
+        g.lineWidth = 1.8;
+        // подвес с роликом
+        g.beginPath(); g.arc(0, 0, 3.4, 0, 6.3); g.stroke();
+        g.beginPath(); g.moveTo(0, 3); g.lineTo(0, 14); g.stroke();
+        // кузов
+        var cg = g.createLinearGradient(0, 14, 0, 38);
+        cg.addColorStop(0, P.bodyHi || P.bodyFill);
+        cg.addColorStop(1, P.bodyShade || P.bodyFill);
+        g.fillStyle = cg;
+        g.beginPath();
+        g.moveTo(-12, 14); g.lineTo(12, 14); g.lineTo(10, 36); g.lineTo(-10, 36);
+        g.closePath(); g.fill(); g.stroke();
+        g.globalAlpha = (1 - R.fade) * 0.45;
+        g.lineWidth = 1.2;
+        g.beginPath();
+        g.moveTo(-6, 15); g.lineTo(-5, 35); g.moveTo(6, 15); g.lineTo(5, 35);
+        g.moveTo(-11, 24); g.lineTo(11, 24);
+        g.stroke();
+        g.globalAlpha = 1 - R.fade;
+        g.lineWidth = 1.8;
+        // руда горкой
+        g.globalAlpha = (1 - R.fade) * 0.75;
+        g.fillStyle = P.hatch;
+        g.beginPath();
+        g.moveTo(-9, 14); g.quadraticCurveTo(-3, 7, 1, 12); g.quadraticCurveTo(5, 7, 9, 14);
+        g.closePath(); g.fill();
+        g.restore();
+        g.globalAlpha = 1 - R.fade;
+      });
+
+      g.restore();
+      g.globalAlpha = 1;
+    },
+
+    /* Передний план: пруд у ограды и тёмная кромка с камышом и травой.
+       Силуэт снизу читается ближе всего — им сцена и закрывается спереди. */
+    drawForeground: function (g, P) {
+      var self = this, x, i;
+      function crest(v) { return 702 + HC.noise(v * 0.0034, 91) * 12; }
+
+      // пруд в ложбине под оградой
+      g.save();
+      g.translate(486, 670);
+      var wg = g.createLinearGradient(0, -24, 0, 24);
+      wg.addColorStop(0, P.groundTop || P.ground);
+      wg.addColorStop(1, P.groundDeep || P.ground);
+      g.fillStyle = wg;
+      g.beginPath(); g.ellipse(0, 0, 140, 22, 0, 0, 6.3); g.fill();
+      g.strokeStyle = P.ink; g.lineWidth = 2; g.globalAlpha = 0.34;
+      g.beginPath(); g.ellipse(0, 0, 140, 22, 0, 0, 6.3); g.stroke();
+      // блики на воде
+      g.globalAlpha = 0.2; g.lineWidth = 1.6; g.lineCap = 'round';
+      var wob = Math.sin(this.t * 0.7) * 5;
+      [[-88, -10, 50], [14, -2, 70], [-48, 6, 84], [40, 12, 48]].forEach(function (b) {
+        g.beginPath();
+        g.moveTo(b[0] + wob * 0.4, b[1]);
+        g.lineTo(b[0] + b[2] + wob * 0.4, b[1]);
+        g.stroke();
+      });
+      g.restore();
+      g.globalAlpha = 1;
+
+      // камыш по берегу
+      g.save();
+      g.strokeStyle = P.fore; g.fillStyle = P.fore;
+      g.lineWidth = 2.2; g.lineCap = 'round';
+      g.globalAlpha = 0.75;
+      [-156, -140, -126, 128, 142, 158, 172].forEach(function (rx, k) {
+        var bx = 486 + rx, by = 670 + (k % 2 ? 5 : 10);
+        var lean = (rx < 0 ? -1 : 1) * (3 + (k % 3)) + Math.sin(self.t * 0.6 + k) * 1.6;
+        g.beginPath(); g.moveTo(bx, by); g.quadraticCurveTo(bx + lean * 0.5, by - 22, bx + lean, by - 38); g.stroke();
+        g.beginPath(); g.ellipse(bx + lean, by - 42, 2.4, 5, lean * 0.02, 0, 6.3); g.fill();
+      });
+      g.restore();
+      g.globalAlpha = 1;
+
+      // тёмная кромка переднего плана
+      g.save();
+      var fg = g.createLinearGradient(0, 690, 0, 850);
+      fg.addColorStop(0, P.fore);
+      fg.addColorStop(1, P.groundDeep || P.fore);
+      g.fillStyle = fg;
+      g.globalAlpha = 0.82;
+      g.beginPath();
+      g.moveTo(-400, VH + 900);
+      for (x = -400; x <= VW + 400; x += 14) g.lineTo(x, crest(x));
+      g.lineTo(VW + 400, VH + 900);
+      g.closePath(); g.fill();
+      g.restore();
+      g.globalAlpha = 1;
+
+      // трава силуэтом на кромке
+      g.save();
+      g.strokeStyle = P.fore;
+      g.globalAlpha = 0.82;
+      g.lineCap = 'round';
+      g.lineWidth = 2.6;
+      for (i = 0; i < 44; i++) {
+        var gx = -380 + i * 46 + HC.noise(i * 1.7, 5) * 22;
+        var gy = crest(gx) + 3;
+        var n = 3 + ((i * 7) % 3);
+        g.beginPath();
+        for (var k2 = 0; k2 < n; k2++) {
+          var off = (k2 - (n - 1) / 2) * 5;
+          var lean = off * 2.4 + Math.sin(this.t * 0.45 + i) * 2.2;
+          g.moveTo(gx + off, gy);
+          g.quadraticCurveTo(gx + lean * 0.6, gy - 15, gx + lean, gy - 27);
+        }
+        g.stroke();
+      }
+      // второй ряд травы ниже и крупнее: на высоком экране он закрывает
+      // низ кадра, и долина не упирается в пустую землю
+      g.lineWidth = 4;
+      for (i = 0; i < 26; i++) {
+        var bx2 = -360 + i * 78 + HC.noise(i * 2.3, 9) * 26;
+        var by2 = crest(bx2) + 104;
+        var n2 = 3 + ((i * 5) % 3);
+        var hh = 46 + HC.noise(i * 3.1 + 0.5, 17) * 30;
+        g.beginPath();
+        for (var k3 = 0; k3 < n2; k3++) {
+          var off2 = (k3 - (n2 - 1) / 2) * 9;
+          var lean2 = off2 * 2.6 + Math.sin(this.t * 0.4 + i * 1.3) * 4;
+          g.moveTo(bx2 + off2, by2);
+          g.quadraticCurveTo(bx2 + lean2 * 0.6, by2 - hh * 0.56, bx2 + lean2, by2 - hh);
+        }
+        g.stroke();
+      }
+      g.lineWidth = 2.6;
+
+      // пара валунов на кромке
+      g.fillStyle = P.fore;
+      [[160, 1.15], [760, 0.9], [1090, 1.3]].forEach(function (b) {
+        var bx = b[0], by = crest(bx) + 6, s2 = b[1];
+        g.beginPath();
+        g.moveTo(bx - 26 * s2, by);
+        g.quadraticCurveTo(bx - 20 * s2, by - 20 * s2, bx - 2 * s2, by - 21 * s2);
+        g.quadraticCurveTo(bx + 22 * s2, by - 18 * s2, bx + 27 * s2, by);
+        g.closePath(); g.fill();
+      });
+      g.restore();
+      g.globalAlpha = 1;
+    },
+
     drawEmpty: function (g, s, P) {
       g.save();
       g.translate(s.x, s.y);
+      g.scale(s.scale || 1, s.scale || 1);
       g.strokeStyle = P.ink;
       g.globalAlpha = 0.35;
       g.lineWidth = 2;
@@ -428,6 +823,7 @@ window.HC = window.HC || {};
     drawLocked: function (g, s, P) {
       g.save();
       g.translate(s.x, s.y);
+      g.scale(s.scale || 1, s.scale || 1);
       g.globalAlpha = 0.16;
       g.strokeStyle = P.ink;
       g.lineWidth = 2;
@@ -477,22 +873,59 @@ window.HC = window.HC || {};
       return this._thumbs[key];
     },
 
+    /* Палитра в один тон: ею рисуется боковая грань постройки. */
+    flatTone: function (tone) {
+      this._flat = this._flat || {};
+      if (!this._flat[tone]) {
+        this._flat[tone] = {
+          ink: tone, bodyFill: tone, bodyHi: tone, bodyShade: tone,
+          rim: tone, rimShade: tone, far0: tone, far1: tone,
+          ground: tone, groundDeep: tone, groundTop: tone, sky0: tone,
+          hatch: tone, shadow: 'rgba(0,0,0,0)'
+        };
+      }
+      return this._flat[tone];
+    },
+
     /* --- Постройки ---------------------------------------- */
     drawBuilding: function (g, type, level, s, P) {
-      // тень на земле — постройка перестаёт быть наклейкой
+      var fn = this.shapes[type];
+      if (!fn) return;
+      var sc = s.scale || 1;
+      var fade = 1 - (ROWS[s.row || 0].fade || 0);
+
+      // тень на земле
       g.save();
-      g.globalAlpha = 0.5;
+      g.globalAlpha = 0.5 * fade;
       g.fillStyle = P.shadow || 'rgba(0,0,0,.2)';
-      g.translate(s.x + 10, s.y + 1);
-      g.scale(1, 0.16);
+      g.translate(s.x + 10 * sc, s.y + 1);
+      g.scale(sc, 0.16 * sc);
       g.beginPath();
       g.arc(0, 0, 46, 0, Math.PI * 2);
       g.fill();
       g.restore();
       g.globalAlpha = 1;
 
+      // боковая грань: тот же силуэт, сдвинутый и залитый одним тоном.
+      // Отсюда и берётся объём — постройка перестаёт быть наклейкой.
+      var tone = P.sideFace || P.groundDeep || P.ground;
       g.save();
+      g.globalAlpha = 0.95 * fade;
+      g.translate(s.x + 11 * sc, s.y - 6 * sc);
+      g.scale(sc, sc);
+      g.strokeStyle = tone;
+      g.fillStyle = tone;
+      g.lineWidth = 2.4;
+      g.lineJoin = 'round';
+      fn.call(this, g, this.flatTone(tone), level, this.t);
+      g.restore();
+      g.globalAlpha = 1;
+
+      // сама постройка
+      g.save();
+      g.globalAlpha = fade;
       g.translate(s.x, s.y);
+      g.scale(sc, sc);
       g.strokeStyle = P.ink;
       var bg = g.createLinearGradient(0, -90, 0, 10);
       bg.addColorStop(0, P.bodyHi || P.bodyFill);
@@ -501,15 +934,18 @@ window.HC = window.HC || {};
       g.fillStyle = bg;
       g.lineWidth = 2.4;
       g.lineJoin = 'round';
-      var fn = this.shapes[type];
-      if (fn) fn.call(this, g, P, level, this.t);
+      fn.call(this, g, P, level, this.t);
       g.restore();
-      this.drawBadge(g, s.x, s.y + 13, level, P);
+      g.globalAlpha = 1;
+
+      this.drawBadge(g, s.x, s.y + 13 * sc, level, P, sc);
     },
 
-    drawBadge: function (g, x, y, level, P) {
+    drawBadge: function (g, x, y, level, P, sc) {
+      sc = sc || 1;
       g.save();
       g.translate(x, y);
+      g.scale(sc, sc);
       g.fillStyle = P.ink;
       g.globalAlpha = 0.85;
       g.globalAlpha = 0.7;

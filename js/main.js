@@ -16,7 +16,7 @@ window.HC = window.HC || {};
       groundTop: '#e7e3db', groundDeep: '#b9b4a8',
       bodyHi: '#ffffff', bodyShade: '#ddd9d2',
       tyreHi: '#4a4843', rimShade: '#cfccc5',
-      shadow: 'rgba(28,27,25,0.20)', vignette: 'rgba(60,55,45,0.12)', fore: '#9c968a', panelSolid: '#fbfaf8'
+      shadow: 'rgba(28,27,25,0.20)', vignette: 'rgba(60,55,45,0.12)', fore: '#9c968a', panelSolid: '#fbfaf8', sideFace: '#b2aca0'
     },
     dark: {
       sky0: '#0f1012', sky1: '#191a1d',
@@ -27,7 +27,7 @@ window.HC = window.HC || {};
       groundTop: '#2b2c32', groundDeep: '#0e0f11',
       bodyHi: '#41434a', bodyShade: '#212228',
       tyreHi: '#26272b', rimShade: '#303238',
-      shadow: 'rgba(0,0,0,0.45)', vignette: 'rgba(0,0,0,0.34)', fore: '#08090a', panelSolid: '#17181b'
+      shadow: 'rgba(0,0,0,0.45)', vignette: 'rgba(0,0,0,0.34)', fore: '#08090a', panelSolid: '#17181b', sideFace: '#3c3e45'
     }
   };
 
