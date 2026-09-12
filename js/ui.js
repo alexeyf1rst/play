@@ -18,7 +18,6 @@ window.HC = window.HC || {};
   HC.icon = ic;
 
   var UP_ICON = { engine: 'engine', tires: 'tires', susp: 'susp', fuel: 'fuel', magnet: 'magnet' };
-  var TUNE_ICON = { gear: 'gearbox', stiff: 'susp', travel: 'travel', press: 'press', balance: 'balance', air: 'air' };
   var QUEST_ICON = {
     dist_run: 'flag', coins_run: 'coin', dist_total: 'road', coins_earn: 'coin',
     flips: 'flip', air: 'cloud', ore: 'ore', runs: 'repeat', cans: 'fuel',
@@ -147,6 +146,7 @@ window.HC = window.HC || {};
     close: function () {
       el.modal.hidden = true;
       current = null;
+      if (this._tick) { clearInterval(this._tick); this._tick = null; }
       if (UI.onClose) { var f = UI.onClose; UI.onClose = null; f(); }
     },
     render: function () {
@@ -155,6 +155,12 @@ window.HC = window.HC || {};
       el['modal-title'].textContent = p.title;
       el['modal-body'].innerHTML = p.html;
       if (p.bind) p.bind(el['modal-body']);
+      // живой таймер: панель со стройкой сама обновляет свои цифры
+      if (this._tick) { clearInterval(this._tick); this._tick = null; }
+      if (p.tick) {
+        var root = el['modal-body'];
+        this._tick = setInterval(function () { p.tick(root); }, 500);
+      }
       this.refreshTop();
     },
     refresh: function () {
@@ -224,7 +230,7 @@ window.HC = window.HC || {};
         var vid = s.vehicle, v = HC.VEHICLES[vid];
         var disc = HC.Economy.workshopDiscount(s);
         var html = '<div class="hero">' + vehiclePic(vid, 200, 130) +
-          '<p>Прокачка и настройка <b>' + v.name + '</b>. У каждой машины они свои.' +
+          '<p>Прокачка <b>' + v.name + '</b>. У каждой машины она своя, купленное остаётся навсегда.' +
           (disc > 0 ? ' Мастерская даёт скидку ' + Math.round(disc * 100) + '%.' : '') + '</p></div>';
         Object.keys(HC.UPGRADES).forEach(function (uid) {
           var u = HC.UPGRADES[uid];
@@ -243,57 +249,23 @@ window.HC = window.HC || {};
                    : '<button class="btn" data-up="' + uid + '" ' + (can(cost, ore) ? '' : 'disabled') + '>Улучшить</button>' + priceTag(cost, ore)) +
             '</div></div>';
         });
-        // --- тюнинг: бесплатные ползунки, влияющие на физику напрямую ---
-        var tune = s.tune[vid] || HC.defaultTune(vid);
-        html += '<h4 class="sec">' + ic('settings') + 'Тюнинг</h4>' +
-          '<p class="muted">Ничего не стоит и меняется в любой момент. Это настоящие ' +
-          'множители в расчёте физики, а не надписи.</p>';
-
-        html += '<div class="tune"><div class="tune-head"><b>' + ic('drive', 'sm') + ' Привод</b></div><div class="seg">';
-        Object.keys(HC.DRIVE).forEach(function (mode) {
-          html += '<button class="' + (tune.drive === mode ? 'on' : '') + '" data-drive="' + mode + '">' +
-                  HC.DRIVE[mode].name + '</button>';
-        });
-        html += '</div><p class="muted">' + (HC.DRIVE[tune.drive] || HC.DRIVE.all).about + '</p></div>';
-
-        Object.keys(HC.TUNING).forEach(function (k) {
-          var K = HC.TUNING[k], val = typeof tune[k] === 'number' ? tune[k] : K.def;
-          html += '<div class="tune">' +
-            '<div class="tune-head"><b>' + ic(TUNE_ICON[k] || 'settings', 'sm') + ' ' + K.name + '</b>' +
-            '<em data-tv="' + k + '">' + UI.tuneLabel(k, val) + '</em></div>' +
-            '<input type="range" data-tune="' + k + '" min="' + Math.round(K.min * 100) + '" max="' + Math.round(K.max * 100) +
-            '" step="' + Math.round(K.step * 100) + '" value="' + Math.round(val * 100) + '">' +
-            '<div class="tune-ends"><i>' + K.low + '</i><i>' + K.high + '</i></div>' +
-            '<p class="muted">' + K.about + '</p></div>';
-        });
-        html += '<button class="btn ghost wide" data-tune-reset>Вернуть заводские настройки</button>';
+        // Характеристики машины: они у неё свои и не настраиваются.
+        var tank = Math.round(v.fuel * HC.upgradeEffect.fuel(s.up[vid].fuel | 0) *
+                              HC.Economy.garageFuel(s) / (v.burn * HC.Economy.garageBurn(s)));
+        html += '<h4 class="sec">' + ic('chart') + 'Какая она</h4>' +
+          '<div class="stat"><span>' + ic('drive', 'sm') + 'привод</span><b>' +
+          (HC.DRIVE[v.drive] || HC.DRIVE.all).name.toLowerCase() + '</b></div>' +
+          '<div class="stat"><span>' + ic('engine', 'sm') + 'предел скорости</span><b>' +
+          Math.round(v.topSpeed * (1 + (s.up[vid].engine | 0) * 0.018) / HC.PPM * 3.6) + ' км/ч</b></div>' +
+          '<div class="stat"><span>' + ic('fuel', 'sm') + 'бак</span><b>' + tank + ' с хода</b></div>' +
+          '<div class="stat"><span>' + ic('susp', 'sm') + 'колесо</span><b>' +
+          Math.round(v.wheel.r * 2 / HC.PPM * 100) + ' см</b></div>' +
+          '<div class="stat"><span>' + ic('chart', 'sm') + 'масса</span><b>' + v.mass + '</b></div>' +
+          '<p class="muted">' + (HC.DRIVE[v.drive] || HC.DRIVE.all).about + '</p>';
 
         return {
           title: 'Гараж', html: html,
           bind: function (root) {
-            root.querySelectorAll('[data-tune]').forEach(function (inp) {
-              var k = inp.getAttribute('data-tune');
-              inp.addEventListener('input', function () {
-                var v = parseInt(inp.value, 10) / 100;
-                G.state.tune[G.state.vehicle][k] = v;
-                var lab = root.querySelector('[data-tv="' + k + '"]');
-                if (lab) lab.textContent = UI.tuneLabel(k, v);
-                HC.save(G.state);
-              });
-              inp.addEventListener('change', function () { HC.save(G.state, true); });
-            });
-            root.querySelectorAll('[data-drive]').forEach(function (b) {
-              b.addEventListener('click', function () {
-                G.state.tune[G.state.vehicle].drive = b.getAttribute('data-drive');
-                HC.Audio.click(); HC.save(G.state, true); UI.refresh();
-              });
-            });
-            root.querySelector('[data-tune-reset]').addEventListener('click', function () {
-              G.state.tune[G.state.vehicle] = HC.defaultTune(G.state.vehicle);
-              HC.Audio.click();
-              UI.toast('Настройки сброшены');
-              HC.save(G.state, true); UI.refresh();
-            });
             root.querySelectorAll('[data-up]').forEach(function (b) {
               b.addEventListener('click', function () {
                 var uid = b.getAttribute('data-up'), u = HC.UPGRADES[uid];
@@ -386,49 +358,78 @@ window.HC = window.HC || {};
     openPlot: function (index) {
       this.open(function () {
         var s = G.state, plot = s.base.plots[index];
-        var html = '', title;
+        var html = '', title, tick = null;
 
         if (!plot) {
           title = 'Пустой участок';
-          html = '<p class="lead">Что здесь построить?</p>';
+          html = '<p class="lead">Что здесь построить? Стройка занимает время — и идёт даже с закрытой игрой.</p>';
           Object.keys(HC.BUILDINGS).forEach(function (bid) {
             var d = HC.BUILDINGS[bid];
             var cost = HC.costOf(d, 0), ore = HC.oreCostOf(d, 0);
             html += '<div class="card">' + buildingPic(bid) +
-              '<div class="card-main"><h3>' + ic(bid) + d.name + '</h3><p>' + d.about + '</p>' +
-              '<p class="muted">' + UI.buildingEffect(bid, 1) + '</p></div>' +
-              '<div class="card-side"><button class="btn" data-build="' + bid + '" ' + (can(cost, ore) ? '' : 'disabled') + '>Построить</button>' +
+              '<div class="card-main"><h3>' + ic(d.icon || bid) + d.name + '</h3><p>' + d.about + '</p>' +
+              '<p class="muted">' + UI.buildingEffect(bid, 1) + ' · ' +
+              ic('clock', 'sm') + ' ' + HC.fmtTime(HC.buildTimeOf(d, 1)) + '</p></div>' +
+              '<div class="card-side"><button class="btn" data-build="' + bid + '" ' + (can(cost, ore) ? '' : 'disabled') + '>Строить</button>' +
               priceTag(cost, ore) + '</div></div>';
           });
-        } else {
+        } else if (plot.build) {
+          // Стройка идёт. Улучшение не мешает работать: постройка остаётся
+          // на прежнем уровне, пока каркас не снимут.
           var d = HC.BUILDINGS[plot.type];
-          title = d.name + ' · уровень ' + plot.level;
-          var maxed = plot.level >= d.max;
-          var cost = maxed ? 0 : HC.costOf(d, plot.level);
-          var ore = maxed ? 0 : HC.oreCostOf(d, plot.level);
-          html = '<div class="hero">' + buildingPic(plot.type, 190, 140) + '<p>' + d.about + '</p></div>' +
-            '<div class="stat"><span>' + ic(plot.type, 'sm') + 'сейчас</span><b>' + UI.buildingEffect(plot.type, plot.level) + '</b></div>' +
-            (maxed ? '' : '<div class="stat"><span>' + ic('plus', 'sm') + 'станет</span><b>' + UI.buildingEffect(plot.type, plot.level + 1) + '</b></div>') +
+          var fresh = plot.level < 1;
+          var to = plot.build.to;
+          title = fresh ? ('Стройка: ' + d.name) : (d.name + ' · улучшение до ' + to);
+          html = '<div class="hero">' + buildingPic(plot.type, 190, 140) + '<p>' +
+            (fresh ? 'Строится. Пока идёт стройка, участок ничего не приносит.'
+                   : 'Работает на уровне ' + plot.level + ', пока идёт улучшение.') +
+            ' Время идёт и когда игра закрыта.</p></div>' +
+            '<div class="stat"><span>' + ic('clock', 'sm') + 'осталось</span><b data-left>' +
+            HC.fmtLeft(HC.Economy.buildLeft(plot)) + '</b></div>' +
+            '<div class="bar"><i data-prog style="width:' +
+            Math.round(HC.Economy.buildProgress(plot) * 100) + '%"></i></div>' +
+            '<div class="stat"><span>' + ic('plus', 'sm') + 'станет</span><b>' +
+            UI.buildingEffect(plot.type, to) + '</b></div>' +
+            '<button class="btn ghost wide" data-cancel>Отменить стройку (деньги вернутся полностью)</button>';
+          tick = function (root) {
+            var pl = G.state.base.plots[index];
+            if (!pl || !pl.build) { UI.refresh(); return; }
+            var lb = root.querySelector('[data-left]');
+            var pg = root.querySelector('[data-prog]');
+            if (lb) lb.textContent = HC.fmtLeft(HC.Economy.buildLeft(pl));
+            if (pg) pg.style.width = Math.round(HC.Economy.buildProgress(pl) * 100) + '%';
+          };
+        } else {
+          var d2 = HC.BUILDINGS[plot.type];
+          title = d2.name + ' · уровень ' + plot.level;
+          var maxed = plot.level >= d2.max;
+          var cost2 = maxed ? 0 : HC.costOf(d2, plot.level);
+          var ore2 = maxed ? 0 : HC.oreCostOf(d2, plot.level);
+          var sec = maxed ? 0 : HC.buildTimeOf(d2, plot.level + 1);
+          html = '<div class="hero">' + buildingPic(plot.type, 190, 140) + '<p>' + d2.about + '</p></div>' +
+            '<div class="stat"><span>' + ic(d2.icon || plot.type, 'sm') + 'сейчас</span><b>' + UI.buildingEffect(plot.type, plot.level) + '</b></div>' +
+            (maxed ? '' : '<div class="stat"><span>' + ic('plus', 'sm') + 'станет</span><b>' + UI.buildingEffect(plot.type, plot.level + 1) + '</b></div>' +
+                          '<div class="stat"><span>' + ic('clock', 'sm') + 'стройка</span><b>' + HC.fmtTime(sec) + '</b></div>') +
             '<div class="card"><div class="card-main"><h3>' + (maxed ? 'Дальше некуда' : 'Улучшить до ' + (plot.level + 1)) + '</h3>' +
-            '<div class="bar"><i style="width:' + Math.round(plot.level / d.max * 100) + '%"></i></div></div>' +
+            '<div class="bar"><i style="width:' + Math.round(plot.level / d2.max * 100) + '%"></i></div></div>' +
             '<div class="card-side">' +
             (maxed ? '<span class="done">максимум</span>'
-                   : '<button class="btn main" data-upg ' + (can(cost, ore) ? '' : 'disabled') + '>Улучшить</button>' + priceTag(cost, ore)) +
+                   : '<button class="btn main" data-upg ' + (can(cost2, ore2) ? '' : 'disabled') + '>Улучшить</button>' + priceTag(cost2, ore2)) +
             '</div></div>' +
             '<button class="btn ghost wide" data-demolish>Разобрать (вернётся половина вложенного)</button>';
         }
         return {
-          title: title, html: html,
+          title: title, html: html, tick: tick,
           bind: function (root) {
             root.querySelectorAll('[data-build]').forEach(function (b) {
               b.addEventListener('click', function () {
                 var bid = b.getAttribute('data-build'), d = HC.BUILDINGS[bid];
                 if (!pay(HC.costOf(d, 0), HC.oreCostOf(d, 0))) return;
-                G.state.base.plots[index] = { type: bid, level: 1 };
+                var sec = HC.Economy.startBuild(G.state, index, bid, 1);
                 HC.Quests.report(G.state, 'build', 1);
                 HC.Base.pop(index);
                 HC.Audio.build();
-                UI.toast(d.name + ' построена');
+                UI.toast(sec ? d.name + ': стройка на ' + HC.fmtTime(sec) : d.name + ' построена');
                 HC.save(G.state, true);
                 UI.refresh();
               });
@@ -438,12 +439,28 @@ window.HC = window.HC || {};
               var p = G.state.base.plots[index], d = HC.BUILDINGS[p.type];
               if (p.level >= d.max) return;
               if (!pay(HC.costOf(d, p.level), HC.oreCostOf(d, p.level))) return;
-              p.level++;
+              var sec = HC.Economy.startBuild(G.state, index, p.type, p.level + 1);
               HC.Quests.report(G.state, 'build', 1);
               HC.Base.pop(index);
               HC.Audio.build();
+              if (sec) UI.toast('Улучшение: ' + HC.fmtTime(sec));
               HC.save(G.state, true);
               UI.refresh();
+            });
+            // Отменённая стройка возвращает всё: наказывать за передумал незачем.
+            var cb = root.querySelector('[data-cancel]');
+            if (cb) cb.addEventListener('click', function () {
+              var p = G.state.base.plots[index];
+              if (!p || !p.build) return;
+              var d = HC.BUILDINGS[p.type];
+              G.state.coins += HC.costOf(d, p.build.to - 1);
+              G.state.ore += HC.oreCostOf(d, p.build.to - 1);
+              if (p.level < 1) G.state.base.plots[index] = null;
+              else delete p.build;
+              HC.Audio.click();
+              UI.toast('Стройка отменена');
+              HC.save(G.state, true);
+              if (G.state.base.plots[index]) UI.refresh(); else UI.close();
             });
             var db = root.querySelector('[data-demolish]');
             if (db) db.addEventListener('click', function () {
@@ -471,14 +488,6 @@ window.HC = window.HC || {};
         if (HC.TRACKS[id].unlock === trackId) next = HC.TRACKS[id].name;
       });
       return next;
-    },
-
-    tuneLabel: function (k, v) {
-      if (k === 'balance') {
-        if (Math.abs(v) < 0.05) return 'нейтрально';
-        return (v > 0 ? 'назад ' : 'вперёд ') + Math.abs(v).toFixed(1);
-      }
-      return '×' + v.toFixed(2);
     },
 
     buildingEffect: function (type, level) {
@@ -661,6 +670,7 @@ window.HC = window.HC || {};
           '<button class="btn" data-cheat="rich">+100 000 монет</button>' +
           '<button class="btn" data-cheat="ore">+2 000 руды</button>' +
           '<button class="btn" data-cheat="hour">+1 час добычи</button>' +
+          '<button class="btn" data-cheat="ready">Достроить всё</button>' +
           '</div>' +
           '<div class="row wrap">' +
           '<button class="btn" data-cheat="unlock">Открыть всё</button>' +
@@ -732,11 +742,15 @@ window.HC = window.HC || {};
                   var got = HC.Economy.accrue(s, 3600);
                   afterCheat('Шахты поработали час: +' + money(Math.floor(got.coins)) + ' в копилку');
                 }
+                else if (what === 'ready') {
+                  var fin = HC.Economy.finishDue(s, Date.now() + 1e12);
+                  fin.forEach(function (idx) { HC.Base.pop(idx); });
+                  afterCheat(fin.length ? 'Достроено: ' + fin.length : 'Стройки нет');
+                }
                 else if (what === 'unlock') {
                   for (i in HC.VEHICLES) {
                     s.owned[i] = true;
                     if (!s.up[i]) { s.up[i] = {}; for (var u2 in HC.UPGRADES) s.up[i][u2] = 0; }
-                    if (!s.tune[i]) s.tune[i] = HC.defaultTune(i);
                   }
                   // этапы открываются медалями, поэтому проставляем бронзу
                   for (i in HC.TRACKS) {

@@ -12,19 +12,10 @@ window.HC = window.HC || {};
   var REF_G = 1400;    // гравитация, под которую считаем пружины
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
-  function Vehicle(id, up, terrain, gravity, tune) {
+  function Vehicle(id, up, terrain, gravity) {
     var def = HC.VEHICLES[id];
     var E = HC.upgradeEffect;
     up = up || {};
-    tune = tune || HC.defaultTune(id);
-    var T = HC.TUNING;
-    function knob(k) {
-      var val = typeof tune[k] === 'number' ? tune[k] : T[k].def;
-      return Math.max(T[k].min, Math.min(T[k].max, val));
-    }
-    var gear = knob('gear'), stiff = knob('stiff'), travel = knob('travel');
-    var press = knob('press'), bal = knob('balance'), airk = knob('air');
-    this.tune = tune;
 
     this.id = id;
     this.def = def;
@@ -32,22 +23,20 @@ window.HC = window.HC || {};
     this.gravity = gravity;
 
     var lu = { engine: up.engine | 0, tires: up.tires | 0, susp: up.susp | 0, fuel: up.fuel | 0, magnet: up.magnet | 0 };
-    // короткая передача даёт тягу, длинная — скорость
-    this.power = def.power * E.engine(lu.engine) / Math.sqrt(gear);
-    this.topSpeed = def.topSpeed * (1 + lu.engine * 0.018) * Math.pow(gear, 0.6);
+    this.power = def.power * E.engine(lu.engine);
+    this.topSpeed = def.topSpeed * (1 + lu.engine * 0.018);
     // покрытие трассы: песок вязкий и скользкий, асфальт наоборот
     var surf = (terrain && terrain.track) || {};
     this.surfGrip = surf.grip || 1;
     this.surfRoll = surf.roll || 1;
     this.lift = def.lift || 0;          // луноход слегка парит
 
-    // низкое давление — цепче, но хуже катится
-    this.grip = def.wheel.grip * E.tires(lu.tires) * (1.30 - 0.30 * press) * this.surfGrip;
-    this.rollFree = 0.5 * (1.70 - 0.70 * press) * this.surfRoll;
-    // отзывчивость в воздухе: общая настройка × характер машины × ползунок тюнинга
+    this.grip = def.wheel.grip * E.tires(lu.tires) * this.surfGrip;
+    this.rollFree = 0.5 * this.surfRoll;
+    // отзывчивость в воздухе: общая настройка × характер машины
     var airBase = def.airCtrl || 1;
-    this.airK = HC.WORLD.airControl * airBase * airk;
-    this.airMax = Math.max(3.6, Math.min(11.5, 5.6 * airBase * Math.sqrt(airk)));
+    this.airK = HC.WORLD.airControl * airBase;
+    this.airMax = Math.max(3.6, Math.min(11.5, 5.6 * airBase));
     // гараж на базе: бак больше, расход меньше
     var st0 = (HC.Game && HC.Game.state && HC.Economy) ? HC.Game.state : null;
     this.maxFuel = def.fuel * E.fuel(lu.fuel) * (st0 ? HC.Economy.garageFuel(st0) : 1);
@@ -66,13 +55,12 @@ window.HC = window.HC || {};
 
     // подвеска: считаем жёсткость из массы и желаемой просадки
     var total = def.mass + def.wheel.mass * def.axles.length;
-    var suspMul = (1 + lu.susp * 0.02) * stiff;
-    this.suspRest = def.susp.rest * (0.85 + 0.15 * travel);
+    this.suspRest = def.susp.rest;
     this.suspMin = def.susp.min;
-    this.suspMax = def.susp.max * (1 + lu.susp * 0.03) * travel;
-    this.suspK = (total * REF_G / def.axles.length) / def.susp.sag * suspMul;
+    this.suspMax = def.susp.max * (1 + lu.susp * 0.03);
+    this.suspK = (total * REF_G / def.axles.length) / def.susp.sag * (1 + lu.susp * 0.02);
     this.suspC = 2 * Math.sqrt(this.suspK * (total / def.axles.length)) * def.susp.damp *
-                 (1 + lu.susp * 0.05) * Math.sqrt(stiff);
+                 (1 + lu.susp * 0.05);
 
     // колёса. Радиус и масса берутся с оси, если она их задаёт —
     // так у трактора заднее колесо больше переднего.
@@ -80,7 +68,7 @@ window.HC = window.HC || {};
       var r = a.r || def.wheel.r;
       var m = a.mass || def.wheel.mass;
       return {
-        lx: a.x + bal * 9, ly: a.y, r: r,       // развесовка сдвигает колёса относительно центра масс
+        lx: a.x, ly: a.y, r: r,
         mass: m,
         I: 0.5 * m * r * r,
         pos: { x: 0, y: 0 }, vel: { x: 0, y: 0 },
@@ -89,8 +77,8 @@ window.HC = window.HC || {};
       };
     });
 
-    // какие колёса ведущие
-    var mode = tune.drive || def.drive || 'all';
+    // какие колёса ведущие — у каждой машины свой привод, он не меняется
+    var mode = def.drive || 'all';
     if (!HC.DRIVE[mode]) mode = 'all';
     this.driveMode = mode;
     var xs = this.wheels.map(function (w) { return w.lx; });

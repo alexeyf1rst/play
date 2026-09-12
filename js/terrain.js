@@ -10,6 +10,8 @@ window.HC = window.HC || {};
   HC.PPM = 24;            // пикселей мира в одном "метре" на счётчике
   var CHUNK = 130;        // шаг раскладки предметов
 
+  var TREE = 360;         // шаг раскладки деревьев-препятствий
+
   function hash(x, y) {
     var h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0;
     h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -27,18 +29,33 @@ window.HC = window.HC || {};
     this.track = track;
     this.trackId = trackId || 'hills';
     this.seed = seed | 0;
+    this.soft = !!track.soft;      // трасса, в которой можно провалиться
+    this.hole = {};                // продавленные в песке воронки
+    this.logs = {};                // поваленные стволы по чанкам
+    this.hasLogs = false;
+    this.mix = track.feats || FEAT_MIX;
     this.base = 0;
     this.base = this.raw(120);
     this.items = {};       // предметы по чанкам
     this.taken = {};       // что уже подобрано в этом заезде
   }
 
-  /* Чем дальше уехал, тем крупнее холмы и злее кочки.
+  /* Каждые 1000 метров трасса становится злее — и так на всех трассах.
+     Ступенька размазана по последней десятой километра: если менять
+     амплитуду рывком, ровно на рубеже вырастет стена.
      Отсюда у заезда появляется естественный конец: рано или поздно
      рельеф станет сложнее, чем твоя машина. */
+  Terrain.prototype.stage = function (x) {
+    var s = x / HC.PPM / 1000;
+    if (s <= 0) return 0;
+    var i = Math.floor(s), f = s - i;
+    var t = f < 0.85 ? 0 : (f - 0.85) / 0.15;
+    return i + t * t * (3 - 2 * t);
+  };
+
+  /* Насыщающаяся сложность: первый километр меняет много, десятый — чуть. */
   Terrain.prototype.hard = function (x) {
-    var k = clamp((x - 7000) / 58000, 0, 1);
-    return k * k * (3 - 2 * k);
+    return 1 - Math.pow(0.78, this.stage(x));
   };
 
   /* --- Фигуры на трассе -----------------------------------
@@ -47,6 +64,19 @@ window.HC = window.HC || {};
      детерминированно, из того же семечка.
   */
   var FEAT = 1500;         // одна фигура на такой отрезок
+  var FEAT_MIX = { ramp: 0.40, table: 0.26, gap: 0.20, bumps: 0.14 };
+
+  /* Выбор фигуры по набору трассы: на хайвэе, например, ям не бывает. */
+  function pickShape(r, mix) {
+    var sum = 0, k;
+    for (k in mix) sum += mix[k];
+    var acc = 0;
+    for (k in mix) {
+      acc += mix[k] / sum;
+      if (r <= acc) return k;
+    }
+    return 'ramp';
+  }
 
   var SHAPES = {
     // трамплин: пологий заход, крутая губа на гребне, обрыв за ней.
@@ -80,7 +110,7 @@ window.HC = window.HC || {};
     var f = null;
     if (k * FEAT > 3600) {
       var r = hash(k, this.seed + 301);
-      var type = r < 0.40 ? 'ramp' : (r < 0.66 ? 'table' : (r < 0.86 ? 'gap' : 'bumps'));
+      var type = pickShape(r, this.mix);
       var w = 380 + hash(k, this.seed + 303) * 320;
       // высота считается от ширины: так крутизна фигуры всегда в рамках,
       // а не зависит от того, какие числа выпали
@@ -120,14 +150,116 @@ window.HC = window.HC || {};
   Terrain.prototype.raw = function (x) {
     var t = this.track, s = this.seed, L = t.len;
     var k = this.hard(x);
-    var amp = t.amp * (1 + k * 0.38);
-    var rough = t.rough * (1 + k * 0.55);
+    var amp = t.amp * (1 + k * 0.62);
+    var rough = t.rough * (1 + k * 1.00);
     var h = vnoise(x / L, s) * amp;
     h += vnoise(x / (L * 0.43) + 17.3, s + 101) * amp * 0.45 * rough;
     h += vnoise(x / (L * 0.19) + 51.7, s + 202) * amp * 0.18 * rough;
     h += vnoise(x / (L * 3.10) + 7.10, s + 303) * amp * 1.10;   // длинная пологая волна
-    h += this.featureH(x) * (0.68 + 0.38 * k);                   // трамплины и ямы
+    h += this.featureH(x) * (0.62 + 0.75 * k);                   // трамплины и ямы
+    h += this.duneH(x);                                          // дюны песочницы
     return h;
+  };
+
+  /* Дюна: длинный наветренный склон и крутой сыпучий подветренный.
+     Ехать вправо — значит долго ползти вверх и разом сыпаться вниз. */
+  var DUNE = 520;
+
+  Terrain.prototype.duneH = function (x) {
+    var t = this.track;
+    if (!t.dunes) return 0;
+    var u = x / DUNE, i = Math.floor(u), f = u - i;
+    var amp = (36 + hash(i, this.seed + 131) * 72) * t.dunes * (1 + this.hard(x) * 0.5);
+    var v = f < 0.78 ? f / 0.78 : (1 - f) / 0.22;
+    v = v * v * (3 - 2 * v);
+    return amp * v;
+  };
+
+  /* --- Жидкий песок --------------------------------------
+     В рыхлых пятнах колесо продавливает воронку: стоишь — тонешь,
+     едешь — выгребаешь. Воронки медленно затягивает обратно.
+     Считать их приходится в height(), поэтому всё держится
+     в ячейках и стоит три обращения к объекту.
+  */
+  var SOFT = 46;           // ширина ячейки воронки
+  var SOFT_MAX = 30;       // насколько глубоко можно провалиться
+
+  /* Насколько песок рыхлый в этой точке: 0 — плотный, 1 — совсем жидкий. */
+  Terrain.prototype.softness = function (x) {
+    var t = this.track;
+    if (!t.soft) return 0;
+    // первую сотню метров песок плотный: провалиться на старте — обидно
+    var warm = clamp((x - 2400) / 2400, 0, 1);
+    if (warm <= 0) return 0;
+    var n = vnoise(x / 640, this.seed + 141) + vnoise(x / 220, this.seed + 142) * 0.45;
+    return clamp((n + 0.28) / 0.85, 0, 1) * t.soft * warm * warm * (3 - 2 * warm);
+  };
+
+  /* Колесо продавило песок. */
+  Terrain.prototype.dig = function (x, amount) {
+    var k = Math.round(x / SOFT);
+    this.hole[k] = Math.min(SOFT_MAX, (this.hole[k] || 0) + amount);
+  };
+
+  /* Глубина воронки в точке. */
+  Terrain.prototype.holeAt = function (x) {
+    var k = x / SOFT, i = Math.floor(k), f = k - i;
+    var a = this.hole[i] || 0, b = this.hole[i + 1] || 0;
+    if (!a && !b) return 0;
+    var u = f * f * (3 - 2 * f);
+    return a + (b - a) * u;
+  };
+
+  /* Песок сам осыпается обратно. */
+  Terrain.prototype.settle = function (dt) {
+    var h = this.hole;
+    for (var k in h) {
+      h[k] -= 7 * dt;
+      if (h[k] <= 0.02) delete h[k];
+    }
+  };
+
+  /* --- Поваленные стволы ---------------------------------
+     Сбитое дерево ложится поперёк дороги и становится настоящим бугром:
+     он входит в высоту поверхности, а значит в него упираются колёса,
+     днище и подвеска — без отдельной «логики столкновений».
+  */
+  var LOG_W = 74;          // полуширина бугра от бревна
+  var LOG_H = 30;          // насколько бревно торчит над землёй
+
+  Terrain.prototype.dropLog = function (x, s) {
+    var k = Math.floor(x / TREE);
+    (this.logs[k] = this.logs[k] || []).push({
+      x: x, w: LOG_W * (0.8 + s * 0.3), h: LOG_H * (0.75 + s * 0.35), s: s
+    });
+    this.hasLogs = true;
+  };
+
+  /* Вклад брёвен в высоту: гладкий бугор (1-t^2)^2, через него надо
+     переползать, но он не стена. */
+  Terrain.prototype.logAt = function (x) {
+    var k = Math.floor(x / TREE), h = 0;
+    for (var j = k - 1; j <= k + 1; j++) {
+      var list = this.logs[j];
+      if (!list) continue;
+      for (var i = 0; i < list.length; i++) {
+        var L = list[i];
+        var t = (x - L.x) / L.w;
+        if (t <= -1 || t >= 1) continue;
+        var c = 1 - t * t;
+        h += L.h * c * c;
+      }
+    }
+    return h;
+  };
+
+  Terrain.prototype.logsIn = function (x0, x1) {
+    var out = [];
+    for (var k = Math.floor(x0 / TREE) - 1; k <= Math.floor(x1 / TREE) + 1; k++) {
+      var list = this.logs[k];
+      if (list) for (var i = 0; i < list.length; i++) out.push(list[i]);
+    }
+    return out;
   };
 
   /* Высота поверхности в точке x. Меньше y — выше в гору.
@@ -135,7 +267,10 @@ window.HC = window.HC || {};
   Terrain.prototype.height = function (x) {
     var f = clamp((x - 120) / 1400, 0, 1);
     var ease = f * f * (3 - 2 * f);
-    return -(this.base + (this.raw(x) - this.base) * ease);
+    var y = -(this.base + (this.raw(x) - this.base) * ease);
+    if (this.soft) y += this.holeAt(x);      // провалились в песок
+    if (this.hasLogs) y -= this.logAt(x);    // лежащий ствол
+    return y;
   };
 
   Terrain.prototype.slope = function (x) {
@@ -168,7 +303,7 @@ window.HC = window.HC || {};
           list.push({ id: k + ':c' + i, type: 'coin', x: cx, y: this.height(cx) - 40 - lift });
         }
       }
-      if (r2 < 0.024) {
+      if (r2 < 0.011) {
         var fx = x0 + 60;
         list.push({ id: k + ':f', type: 'fuel', x: fx, y: this.height(fx) - 34 });
       }
@@ -239,10 +374,9 @@ window.HC = window.HC || {};
   };
 
   /* --- Деревья на дороге (трасса «Лес») -------------------
-     Стоят прямо на пути: объехать нельзя, снести можно, но машина
-     теряет ход. Сломанные помнятся до конца заезда.
+     Стоят прямо на пути. Сбить можно — но ствол ложится поперёк
+     дороги и остаётся преградой до конца заезда.
   */
-  var TREE = 320;
 
   Terrain.prototype.treesIn = function (x0, x1) {
     if (!this.track.trees) return [];
@@ -250,7 +384,7 @@ window.HC = window.HC || {};
     var out = [];
     for (var k = Math.floor(x0 / TREE); k <= Math.floor(x1 / TREE); k++) {
       if (k * TREE < 900) continue;                 // у старта пусто
-      if (hash(k, this.seed + 61) > 0.42) continue;
+      if (hash(k, this.seed + 61) > 0.32) continue;
       var x = k * TREE + hash(k, this.seed + 62) * TREE * 0.7;
       out.push({
         id: k,
@@ -274,12 +408,13 @@ window.HC = window.HC || {};
   Terrain.prototype.farDecorIn = function (x0, x1, seedOff) {
     var out = [];
     var step = 150;
+    var set = this.track.far || ['pine', 'tree'];
     for (var k = Math.floor(x0 / step); k <= Math.floor(x1 / step); k++) {
       if (hash(k, this.seed + seedOff) < 0.5) {
         out.push({
           x: k * step + hash(k, this.seed + seedOff + 1) * step * 0.7,
           s: 0.4 + hash(k, this.seed + seedOff + 2) * 0.25,
-          type: hash(k, this.seed + seedOff + 3) < 0.5 ? 'pine' : 'tree'
+          type: set[Math.floor(hash(k, this.seed + seedOff + 3) * set.length)]
         });
       }
     }
@@ -362,7 +497,10 @@ window.HC = window.HC || {};
     g.stroke();
     g.globalAlpha = 1;
 
-    if (quality !== 'low') {
+    // хайвэй: вместо земляной кромки — полотно с разметкой
+    if (this.track.road) this.drawRoad(g, pts, cam, W, P);
+
+    if (quality !== 'low' && !this.track.road) {
       g.strokeStyle = P.hatch;
       g.lineWidth = 1;
       g.globalAlpha = 0.45;
@@ -385,6 +523,123 @@ window.HC = window.HC || {};
     g.lineJoin = 'round';
     trace();
     g.stroke();
+  };
+
+  /* Асфальт. В профиль дорога видна почти с торца, поэтому полотно —
+     это широкая тёмная полоса по кромке: светлая линия обочины сверху,
+     прерывистая разметка ниже. Пунктир привязан к миру, а не к экрану,
+     иначе разметка ползла бы вместе с камерой. */
+  Terrain.prototype.drawRoad = function (g, pts, cam, W, P) {
+    function trace(off) {
+      g.beginPath();
+      g.moveTo(pts[0].sx, pts[0].sy + off);
+      for (var i = 1; i < pts.length; i++) g.lineTo(pts[i].sx, pts[i].sy + off);
+    }
+    var z = cam.z;
+    g.save();
+    g.lineJoin = 'round';
+    g.lineCap = 'butt';
+
+    g.strokeStyle = P.road || P.groundDeep || P.ground;
+    g.lineWidth = 30 * z;
+    trace(15 * z);
+    g.stroke();
+
+    g.strokeStyle = P.roadLine || P.bodyFill;
+    g.globalAlpha = 0.85;
+    g.lineWidth = Math.max(1.5, 3 * z);
+    trace(2 * z);
+    g.stroke();
+
+    // разметка по середине полотна
+    var period = 46 * z;
+    var x0 = cam.x + (pts[0].sx - W / 2) / z;     // мир в начале ломаной
+    g.setLineDash([26 * z, 20 * z]);
+    g.lineDashOffset = -((x0 * z) % period);
+    g.globalAlpha = 0.62;
+    g.lineWidth = Math.max(1.2, 2.6 * z);
+    trace(15 * z);
+    g.stroke();
+    g.setLineDash([]);
+    g.restore();
+    g.globalAlpha = 1;
+  };
+
+  /* Отбойник вдоль полотна: стойки и двойная лента, повторяющая профиль.
+     Рисуется в мировых координатах, до машины — то есть позади неё. */
+  Terrain.prototype.drawRail = function (g, x0, x1, P) {
+    if (!this.track.rail) return;
+    var step = 62, x;
+    g.save();
+    g.strokeStyle = P.ink;
+    g.lineCap = 'round';
+
+    g.globalAlpha = 0.45;
+    g.lineWidth = 3;
+    g.beginPath();
+    for (x = Math.floor(x0 / step) * step; x < x1; x += step) {
+      var y = this.height(x);
+      g.moveTo(x, y + 2);
+      g.lineTo(x, y - 38);
+    }
+    g.stroke();
+
+    g.globalAlpha = 0.7;
+    g.lineWidth = 4.5;
+    var first = true;
+    g.beginPath();
+    for (x = Math.floor(x0 / 18) * 18; x < x1; x += 18) {
+      var yy = this.height(x) - 34;
+      if (first) { g.moveTo(x, yy); first = false; } else g.lineTo(x, yy);
+    }
+    g.stroke();
+    g.restore();
+    g.globalAlpha = 1;
+  };
+
+  /* Лежащий ствол. Препятствие уже сидит в высоте поверхности, поэтому
+     здесь только сам ствол: он лежит в бугре, нижняя половина в земле. */
+  Terrain.prototype.drawLog = function (g, L, P) {
+    // земля без самого бревна — иначе ствол повис бы над своим же бугром
+    var ground = this.height(L.x) + this.logAt(L.x);
+    var len = L.w * 1.5;
+    var hgt = L.h + 10;
+    var top = ground - L.h - 1;
+
+    g.save();
+    g.translate(L.x, 0);
+    g.globalAlpha = 0.2;
+    g.fillStyle = P.shadow || 'rgba(0,0,0,.2)';
+    g.beginPath();
+    g.ellipse(6, ground + 2, len * 0.55, 6, 0, 0, 6.3);
+    g.fill();
+    g.globalAlpha = 1;
+
+    var lg = g.createLinearGradient(0, top, 0, top + hgt);
+    lg.addColorStop(0, P.bodyHi || P.bodyFill);
+    lg.addColorStop(1, P.bodyShade || P.bodyFill);
+    g.fillStyle = lg;
+    g.strokeStyle = P.ink;
+    g.lineWidth = 2.4;
+    g.lineJoin = 'round';
+    g.beginPath();
+    if (g.roundRect) g.roundRect(-len / 2, top, len, hgt, hgt / 2);
+    else g.rect(-len / 2, top, len, hgt);
+    g.fill();
+    g.stroke();
+
+    // срез с годовыми кольцами и пара сучьев
+    g.lineWidth = 1.5;
+    g.globalAlpha = 0.7;
+    g.beginPath();
+    g.ellipse(len / 2 - hgt / 2.6, top + hgt * 0.42, hgt * 0.16, hgt * 0.3, 0, 0, 6.3);
+    g.stroke();
+    g.beginPath();
+    g.moveTo(-len * 0.22, top + 3); g.lineTo(-len * 0.3, top - 16);
+    g.moveTo(len * 0.06, top + 2); g.lineTo(len * 0.16, top - 13);
+    g.stroke();
+    g.restore();
+    g.globalAlpha = 1;
   };
 
   /* Облака. Рисуются в координатах экрана, поэтому заполняют небо

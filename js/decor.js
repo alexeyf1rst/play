@@ -12,7 +12,7 @@ window.HC = window.HC || {};
   HC.DECOR_SETS = {
     hills:  ['tree', 'tree', 'bush', 'pine', 'rock', 'fence', 'pole', 'grass', 'grass', 'lamp', 'crates'],
     sand:    ['cactus', 'cactus', 'rock', 'grass', 'bush', 'skull', 'crates'],
-    highway: ['lamp', 'pole', 'fence', 'grass', 'bush', 'crates', 'tree'],
+    highway: ['lamp', 'sign', 'pole', 'cone', 'barrier', 'grass', 'billboard', 'lamp', 'sign'],
     forest:  ['pine', 'tree', 'bush', 'grass', 'rock', 'pine'],
     moon:   ['rock', 'rock', 'crater', 'flag', 'rock', 'crater'],
     base:   ['tree', 'bush', 'grass', 'rock', 'fence', 'pine']
@@ -231,6 +231,78 @@ window.HC = window.HC || {};
       g.closePath(); g.fill(); g.stroke();
       g.beginPath(); g.arc(0, -78, 3, 0, 6.3); g.fill(); g.stroke();
     },
+    /* Дорожный знак на столбике */
+    sign: function (g, P) {
+      g.strokeStyle = P.ink; g.lineWidth = 2.6; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -44); g.stroke();
+      var sg = g.createLinearGradient(0, -70, 0, -40);
+      sg.addColorStop(0, P.bodyHi || P.bodyFill);
+      sg.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = sg; g.lineWidth = 2.4; g.lineJoin = 'round';
+      g.beginPath();
+      if (g.roundRect) g.roundRect(-17, -68, 34, 26, 5); else g.rect(-17, -68, 34, 26);
+      g.fill(); g.stroke();
+      // стрелка вперёд — единственное, что знак сообщает
+      g.lineWidth = 2.2;
+      g.beginPath();
+      g.moveTo(-8, -55); g.lineTo(8, -55);
+      g.moveTo(3, -60); g.lineTo(8, -55); g.lineTo(3, -50);
+      g.stroke();
+    },
+    /* Конус */
+    cone: function (g, P) {
+      var cg = g.createLinearGradient(-10, -26, 10, 0);
+      cg.addColorStop(0, P.bodyHi || P.bodyFill);
+      cg.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = cg; g.strokeStyle = P.ink; g.lineWidth = 2.2; g.lineJoin = 'round';
+      g.beginPath();
+      g.moveTo(-11, 0); g.lineTo(-4, -24); g.lineTo(4, -24); g.lineTo(11, 0);
+      g.closePath(); g.fill(); g.stroke();
+      g.lineWidth = 1.6;
+      g.beginPath(); g.moveTo(-8, -9); g.lineTo(8, -9); g.moveTo(-6, -16); g.lineTo(6, -16); g.stroke();
+      g.lineWidth = 2.2;
+      g.beginPath(); g.moveTo(-14, 0); g.lineTo(14, 0); g.stroke();
+    },
+    /* Бетонный блок с полосами */
+    barrier: function (g, P) {
+      var bg = g.createLinearGradient(0, -22, 0, 0);
+      bg.addColorStop(0, P.bodyHi || P.bodyFill);
+      bg.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = bg; g.strokeStyle = P.ink; g.lineWidth = 2.3; g.lineJoin = 'round';
+      g.beginPath();
+      g.moveTo(-26, 0); g.lineTo(-20, -20); g.lineTo(20, -20); g.lineTo(26, 0);
+      g.closePath(); g.fill(); g.stroke();
+      g.lineWidth = 1.5;
+      g.globalAlpha = 0.7;
+      g.beginPath();
+      for (var i = -3; i <= 3; i++) {
+        g.moveTo(i * 8 - 4, -2); g.lineTo(i * 8 + 4, -18);
+      }
+      g.stroke();
+      g.globalAlpha = 1;
+    },
+    /* Пустой щит на двух ногах */
+    billboard: function (g, P) {
+      g.strokeStyle = P.ink; g.lineWidth = 2.6;
+      g.beginPath();
+      g.moveTo(-14, 0); g.lineTo(-12, -46);
+      g.moveTo(14, 0); g.lineTo(12, -46);
+      g.stroke();
+      g.lineWidth = 1.6;
+      g.beginPath(); g.moveTo(-13, -24); g.lineTo(13, -24); g.stroke();
+      var bg = g.createLinearGradient(0, -84, 0, -44);
+      bg.addColorStop(0, P.bodyHi || P.bodyFill);
+      bg.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = bg; g.lineWidth = 2.4;
+      g.beginPath(); g.rect(-30, -82, 60, 38); g.fill(); g.stroke();
+      g.lineWidth = 1.4; g.globalAlpha = 0.5;
+      g.beginPath();
+      g.moveTo(-22, -70); g.lineTo(14, -70);
+      g.moveTo(-22, -62); g.lineTo(18, -62);
+      g.moveTo(-22, -54); g.lineTo(2, -54);
+      g.stroke();
+      g.globalAlpha = 1;
+    },
     /* Флажок на Луне */
     flag: function (g, P) {
       g.strokeStyle = P.ink; g.lineWidth = 2.4;
@@ -242,6 +314,10 @@ window.HC = window.HC || {};
     }
   };
 
+  /* Что нельзя отражать: у знака отражается стрелка, и она начинает
+     показывать назад. */
+  var NO_FLIP = { sign: 1, billboard: 1 };
+
   HC.Decor = {
     shapes: S,
     /* Нарисовать один предмет. Начало координат — точка на земле. */
@@ -250,7 +326,7 @@ window.HC = window.HC || {};
       if (!fn) return;
       g.save();
       if (scale !== 1) g.scale(scale, scale);
-      if (flip) g.scale(-1, 1);
+      if (flip && !NO_FLIP[type]) g.scale(-1, 1);
       g.lineJoin = 'round';
       fn(g, P);
       g.restore();

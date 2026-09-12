@@ -16,7 +16,8 @@ window.HC = window.HC || {};
       groundTop: '#e7e3db', groundDeep: '#b9b4a8',
       bodyHi: '#ffffff', bodyShade: '#ddd9d2',
       tyreHi: '#4a4843', rimShade: '#cfccc5',
-      shadow: 'rgba(28,27,25,0.20)', vignette: 'rgba(60,55,45,0.12)', fore: '#9c968a', panelSolid: '#fbfaf8', sideFace: '#b2aca0'
+      shadow: 'rgba(28,27,25,0.20)', vignette: 'rgba(60,55,45,0.12)', fore: '#9c968a', panelSolid: '#fbfaf8', sideFace: '#b2aca0',
+      road: '#a8a29a', roadLine: '#f7f5f1'
     },
     dark: {
       sky0: '#0f1012', sky1: '#191a1d',
@@ -27,7 +28,8 @@ window.HC = window.HC || {};
       groundTop: '#2b2c32', groundDeep: '#0e0f11',
       bodyHi: '#41434a', bodyShade: '#212228',
       tyreHi: '#26272b', rimShade: '#303238',
-      shadow: 'rgba(0,0,0,0.45)', vignette: 'rgba(0,0,0,0.34)', fore: '#08090a', panelSolid: '#17181b', sideFace: '#3c3e45'
+      shadow: 'rgba(0,0,0,0.45)', vignette: 'rgba(0,0,0,0.34)', fore: '#08090a', panelSolid: '#17181b', sideFace: '#3c3e45',
+      road: '#15161a', roadLine: '#7e8087'
     }
   };
 
@@ -403,10 +405,29 @@ window.HC = window.HC || {};
       // добыча копится и на базе, и в заезде
       this.accum += dt;
       if (this.accum >= 1) {
-        HC.Economy.accrue(this.state, this.accum, true);
+        var got = HC.Economy.accrue(this.state, this.accum, true);
         this.accum = 0;
         this.state.stats.playTime += 1;
+        if (got.done && got.done.length) this.onBuilt(got.done);
         if (this.scene === 'base') HC.UI.refreshPending();
+      }
+    },
+
+    /* Стройка закончилась — постройка садится на место, и об этом говорят. */
+    onBuilt: function (list) {
+      var st = this.state, names = [];
+      for (var i = 0; i < list.length; i++) {
+        var p = st.base.plots[list[i]];
+        if (!p) continue;
+        HC.Base.pop(list[i]);
+        names.push(HC.BUILDINGS[p.type].name);
+      }
+      HC.save(st, true);
+      if (!names.length) return;
+      HC.Audio.build();
+      if (this.scene === 'base') {
+        HC.UI.toast(names.length === 1 ? names[0] + ': готово' : 'Готово построек: ' + names.length);
+        HC.UI.refresh();
       }
     },
 

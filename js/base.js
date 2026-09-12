@@ -12,7 +12,56 @@ window.HC = window.HC || {};
   HC.Economy = {
     each: function (state, type, fn) {
       var p = state.base.plots;
-      for (var i = 0; i < p.length; i++) if (p[i] && p[i].type === type) fn(p[i], i);
+      // уровень 0 — это стройка на пустом участке: она ещё ничего не даёт
+      for (var i = 0; i < p.length; i++) if (p[i] && p[i].type === type && p[i].level > 0) fn(p[i], i);
+    },
+
+    /* --- Стройка занимает время ----------------------------
+       Постройка и улучшение не появляются по щелчку: на них уходит
+       время, и оно идёт, даже когда игра закрыта. Пока идёт улучшение,
+       постройка продолжает работать на прежнем уровне. */
+    buildLeft: function (plot, at) {
+      if (!plot || !plot.build) return 0;
+      return Math.max(0, (plot.build.end - (at || Date.now())) / 1000);
+    },
+    buildProgress: function (plot, at) {
+      if (!plot || !plot.build) return 1;
+      return clamp(1 - this.buildLeft(plot, at) / (plot.build.span || 1), 0, 1);
+    },
+    /* Заложить стройку или улучшение. Возвращает, сколько секунд ждать. */
+    startBuild: function (state, index, type, to) {
+      var d = HC.BUILDINGS[type];
+      var sec = HC.buildTimeOf(d, to);
+      var cur = state.base.plots[index];
+      var level = (cur && cur.type === type) ? cur.level : 0;
+      if (!sec) {
+        state.base.plots[index] = { type: type, level: to };
+        return 0;
+      }
+      state.base.plots[index] = {
+        type: type, level: level,
+        build: { to: to, end: Date.now() + sec * 1000, span: sec }
+      };
+      return sec;
+    },
+    /* Достроить всё, что успело закончиться к моменту at. */
+    finishDue: function (state, at) {
+      var p = state.base.plots, done = [];
+      for (var i = 0; i < p.length; i++) {
+        var pl = p[i];
+        if (pl && pl.build && pl.build.end <= at) {
+          pl.level = pl.build.to;
+          delete pl.build;
+          done.push(i);
+        }
+      }
+      return done;
+    },
+    /* Сколько стройки идёт прямо сейчас */
+    building: function (state) {
+      var p = state.base.plots, n = 0;
+      for (var i = 0; i < p.length; i++) if (p[i] && p[i].build) n++;
+      return n;
     },
     buildingRate: function (type, level) {
       var d = HC.BUILDINGS[type];
@@ -95,8 +144,44 @@ window.HC = window.HC || {};
       this.each(state, 'garden', function (p) { h += HC.BUILDINGS.garden.offline * p.level; });
       return h;
     },
-    /* Копим добычу. dt в секундах. */
+    /* Копим добычу. seconds — сколько прошло времени.
+       Окно режется по моментам, когда заканчиваются стройки: иначе
+       достроенная за ночь шахта считалась бы работавшей всю ночь. */
     accrue: function (state, seconds, online) {
+      var now = Date.now();
+      var t0 = now - Math.max(0, seconds) * 1000;
+      var p = state.base.plots, marks = [], i;
+      for (i = 0; i < p.length; i++) {
+        if (p[i] && p[i].build && p[i].build.end > t0 && p[i].build.end <= now) marks.push(p[i].build.end);
+      }
+      marks.sort(function (a, b) { return a - b; });
+      marks.push(now);
+      var got = { coins: 0, ore: 0, done: [] }, prev = t0;
+      for (i = 0; i < marks.length; i++) {
+        var seg = (marks[i] - prev) / 1000;
+        if (seg > 0) {
+          var one = this.tick(state, seg);
+          got.coins += one.coins;
+          got.ore += one.ore;
+        }
+        got.done = got.done.concat(this.finishDue(state, marks[i]));
+        prev = marks[i];
+      }
+      state.base.lastTick = now;
+
+      // депо само свозит накопленное на склад, пока игра открыта
+      if (online) {
+        var every = this.autoEvery(state);
+        if (every) {
+          state.base.autoT = (state.base.autoT || 0) + seconds;
+          if (state.base.autoT >= every) { state.base.autoT = 0; this.collect(state); }
+        }
+      }
+      return got;
+    },
+
+    /* Один отрезок начисления, внутри которого состав базы не менялся. */
+    tick: function (state, seconds) {
       var r = this.rates(state), cap = this.capacity(state);
       var pend = state.base.pending;
       var before = { coins: pend.coins, ore: pend.ore };
@@ -113,16 +198,6 @@ window.HC = window.HC || {};
         pend.coins = Math.min(cap.coins, pend.coins + sm.coins / 60 * seconds * (got / want));
       }
 
-      state.base.lastTick = Date.now();
-
-      // депо само свозит накопленное на склад, пока игра открыта
-      if (online) {
-        var every = this.autoEvery(state);
-        if (every) {
-          state.base.autoT = (state.base.autoT || 0) + seconds;
-          if (state.base.autoT >= every) { state.base.autoT = 0; this.collect(state); }
-        }
-      }
       return { coins: pend.coins - before.coins, ore: pend.ore - before.ore };
     },
     /* Что накопилось, пока игра была закрыта */
@@ -131,7 +206,8 @@ window.HC = window.HC || {};
       var maxSec = this.offlineHours(state) * 3600;
       var used = clamp(elapsed, 0, maxSec);
       var got = this.accrue(state, used);
-      return { coins: got.coins, ore: got.ore, seconds: elapsed, capped: elapsed > maxSec };
+      return { coins: got.coins, ore: got.ore, done: got.done,
+               seconds: elapsed, capped: elapsed > maxSec };
     },
     collect: function (state) {
       var p = state.base.pending;
@@ -940,7 +1016,7 @@ window.HC = window.HC || {};
         if (!seen(s.x, s.y)) return;
         out.push({
           dep: s.dep + 1.4, x: s.x, s: s, plot: plot,
-          draw: function (g, P, it) { this.drawBuilding(g, it.plot.type, it.plot.level, it.s, P); }
+          draw: function (g, P, it) { this.drawBuilding(g, it.plot.type, it.plot.level, it.s, P, it.plot); }
         });
       });
 
@@ -1317,9 +1393,12 @@ window.HC = window.HC || {};
     },
 
     /* --- Постройки ---------------------------------------- */
-    drawBuilding: function (g, type, level, s, P) {
+    drawBuilding: function (g, type, level, s, P, plot) {
       var fn = this.shapes[type];
       if (!fn) return;
+      var site = plot && plot.build;
+      // на пустом участке стройка — это ещё не постройка, а котлован
+      if (site && level < 1) { this.drawSite(g, s, P, plot, true); return; }
       var sc = s.scale || 1;
       var fade = 1 - (s.fade || 0);
       var grow = 1.18 * (1 + 0.04 * tier(level));   // прокачанная постройка и крупнее
@@ -1343,6 +1422,9 @@ window.HC = window.HC || {};
       g.fill();
       g.restore();
       g.globalAlpha = 1;
+
+      // строительные леса вокруг постройки — за ней, чтобы не мешать смотреть
+      if (site) this.drawScaffold(g, s, P, false);
 
       // Боковая грань: тот же силуэт, сдвинутый и залитый одним тоном —
       // отсюда объём. На сильном отъезде её всё равно не разглядеть, а
@@ -1375,7 +1457,186 @@ window.HC = window.HC || {};
       g.restore();
       g.globalAlpha = 1;
 
+      if (site) this.drawScaffold(g, s, P, true);
       this.drawBadge(g, s.x, s.y + 13 * sc, level, P, sc);
+      if (site) this.drawBuildBar(g, s.x, s.y + 32 * sc, HC.Economy.buildProgress(plot), P, sc);
+    },
+
+    /* Леса вокруг работающей постройки: стойки и перекладины за ней,
+       снизу — передние поручни и лебёдка. Постройка при этом остаётся
+       читаемой: улучшение не должно прятать то, что улучшаешь. */
+    drawScaffold: function (g, s, P, front) {
+      var sc = s.scale || 1;
+      var fade = 1 - (s.fade || 0);
+      g.save();
+      g.translate(s.x, s.y);
+      g.scale(sc, sc);
+      g.strokeStyle = P.ink;
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+
+      if (!front) {
+        g.globalAlpha = 0.6 * fade;
+        g.lineWidth = 2.2;
+        g.beginPath();
+        var posts = [-40, -14, 14, 40];
+        for (var i = 0; i < posts.length; i++) {
+          g.moveTo(posts[i], 4 + Math.abs(posts[i]) * 0.16);
+          g.lineTo(posts[i] + 2, -66 - (i % 2) * 10);
+        }
+        g.moveTo(-40, -30); g.lineTo(42, -38);
+        g.moveTo(-40, -56); g.lineTo(42, -64);
+        g.stroke();
+      } else {
+        // передний поручень и лебёдка с блоком
+        g.globalAlpha = 0.45 * fade;
+        g.lineWidth = 2;
+        g.beginPath();
+        g.moveTo(-42, -14); g.lineTo(44, -22);
+        g.stroke();
+        g.globalAlpha = 0.75 * fade;
+        g.lineWidth = 2.4;
+        g.beginPath();
+        g.moveTo(46, 6); g.lineTo(44, -58);
+        g.lineTo(22, -54);
+        g.stroke();
+        g.lineWidth = 1.6;
+        g.beginPath();
+        g.moveTo(24, -54); g.lineTo(24, -40);
+        g.stroke();
+        g.lineWidth = 2;
+        g.fillStyle = P.bodyFill;
+        g.beginPath();
+        if (g.roundRect) g.roundRect(17, -40, 14, 10, 3); else g.rect(17, -40, 14, 10);
+        g.fill(); g.stroke();
+      }
+      g.restore();
+      g.globalAlpha = 1;
+    },
+
+    /* Стройка: котлован, каркас, кран и полоска времени.
+       Пока идёт улучшение, постройка работает и стоит на месте —
+       каркас просто растёт вокруг неё. */
+    drawSite: function (g, s, P, plot, fresh) {
+      var sc = s.scale || 1;
+      var fade = 1 - (s.fade || 0);
+      var pr = HC.Economy.buildProgress(plot);
+
+      g.save();
+      g.translate(s.x, s.y);
+      g.scale(sc, sc);
+      g.lineJoin = 'round';
+      g.lineCap = 'round';
+
+      if (fresh) {
+        // тень и плита фундамента
+        g.globalAlpha = 0.4 * fade;
+        g.fillStyle = P.shadow || 'rgba(0,0,0,.2)';
+        g.save();
+        g.translate(14, -8);
+        g.scale(1, 0.5);
+        g.beginPath(); g.arc(0, 0, 44, 0, Math.PI * 2); g.fill();
+        g.restore();
+
+        // котлован: тёмная яма со стенкой и отвалом рядом
+        g.globalAlpha = fade;
+        g.fillStyle = P.groundDeep || P.ground;
+        g.strokeStyle = P.ink;
+        g.lineWidth = 2.2;
+        g.beginPath();
+        g.moveTo(-44, -6); g.lineTo(0, -28); g.lineTo(44, -6); g.lineTo(0, 16);
+        g.closePath(); g.fill();
+        g.globalAlpha = 0.55 * fade;
+        g.stroke();
+        g.globalAlpha = 0.3 * fade;
+        g.lineWidth = 1.4;
+        g.beginPath();
+        for (var hx = -30; hx <= 30; hx += 12) {
+          g.moveTo(hx, -6 - hx * 0.5 * (hx > 0 ? 1 : -1) * 0 + Math.abs(hx) * 0.0);
+          g.lineTo(hx + 6, 4);
+        }
+        g.stroke();
+        // отвал земли у края
+        g.globalAlpha = 0.8 * fade;
+        g.fillStyle = P.sideFace || P.groundDeep || P.ground;
+        g.lineWidth = 2;
+        g.beginPath();
+        g.moveTo(46, 2); g.lineTo(54, -10); g.lineTo(64, -4); g.lineTo(68, 4);
+        g.closePath();
+        g.fill();
+        g.globalAlpha = 0.45 * fade;
+        g.stroke();
+        // растёт снизу вверх: видно, что дело движется
+        g.globalAlpha = 0.55 * fade;
+        g.strokeStyle = P.ink;
+        g.lineWidth = 1.6;
+        g.beginPath();
+        for (var w = -30; w <= 30; w += 15) {
+          g.moveTo(w, -6 + Math.abs(w) * 0.22);
+          g.lineTo(w, -6 + Math.abs(w) * 0.22 - 8 - 26 * pr);
+        }
+        g.stroke();
+      }
+
+      // каркас из стоек и перекладин
+      g.globalAlpha = 0.7 * fade;
+      g.strokeStyle = P.ink;
+      g.lineWidth = 2.2;
+      g.beginPath();
+      var posts = [-36, -12, 16, 38];
+      for (var i = 0; i < posts.length; i++) {
+        g.moveTo(posts[i], 2 + Math.abs(posts[i]) * 0.16);
+        g.lineTo(posts[i] + 2, -54 - (i % 2) * 12);
+      }
+      g.moveTo(-36, -26); g.lineTo(40, -34);
+      g.moveTo(-36, -46); g.lineTo(40, -52);
+      g.stroke();
+
+      // кран: башня, стрела и крюк, который висит на высоте прогресса
+      g.lineWidth = 2.6;
+      g.globalAlpha = 0.85 * fade;
+      g.beginPath();
+      g.moveTo(34, 6); g.lineTo(34, -96);
+      g.moveTo(34, -96); g.lineTo(-30, -80);
+      g.moveTo(34, -96); g.lineTo(48, -84);
+      g.stroke();
+      g.lineWidth = 1.6;
+      var hook = -76 + 44 * pr;
+      g.beginPath();
+      g.moveTo(-14, -83); g.lineTo(-14, hook);
+      g.stroke();
+      g.lineWidth = 2.2;
+      g.beginPath();
+      if (g.roundRect) g.roundRect(-23, hook, 18, 13, 3); else g.rect(-23, hook, 18, 13);
+      g.fillStyle = P.bodyFill;
+      g.fill(); g.stroke();
+      g.restore();
+      g.globalAlpha = 1;
+
+      this.drawBuildBar(g, s.x, s.y + (fresh ? 15 : 32) * sc, pr, P, sc);
+    },
+
+    /* Полоска: сколько стройки осталось */
+    drawBuildBar: function (g, x, y, pr, P, sc) {
+      var w = 48;
+      g.save();
+      g.translate(x, y);
+      g.scale(sc, sc);
+      g.globalAlpha = 0.9;
+      g.fillStyle = P.panelSolid || P.sky0;
+      g.strokeStyle = P.ink;
+      g.lineWidth = 1.4;
+      g.beginPath();
+      if (g.roundRect) g.roundRect(-w / 2, -5, w, 10, 5); else g.rect(-w / 2, -5, w, 10);
+      g.fill(); g.stroke();
+      g.fillStyle = P.ink;
+      g.globalAlpha = 0.7;
+      g.beginPath();
+      var iw = Math.max(3, (w - 6) * pr);
+      if (g.roundRect) g.roundRect(-w / 2 + 3, -2, iw, 4, 2); else g.rect(-w / 2 + 3, -2, iw, 4);
+      g.fill();
+      g.restore();
+      g.globalAlpha = 1;
     },
 
     /* Заливка корпуса: градиент один на тему, а не новый на каждую постройку */

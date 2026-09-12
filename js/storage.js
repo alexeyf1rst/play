@@ -36,7 +36,6 @@ window.HC = window.HC || {};
       tracks: { hills: true },
       track: 'hills',
       up: { jeep: defaultUpgrades() },
-      tune: { jeep: HC.defaultTune('jeep') },
       quests: {},
       base: {
         plots: plots,
@@ -89,22 +88,14 @@ window.HC = window.HC || {};
     }
     if (s.stats) s.stats.best = cleanBest;
 
-    // прокачка и тюнинг — свои на каждую машину
+    // прокачка — своя на каждую машину; тюнинга больше нет
     s.up = s.up || {};
-    s.tune = s.tune || {};
+    delete s.tune;
     for (var v in HC.VEHICLES) {
       s.up[v] = s.up[v] || defaultUpgrades();
       for (var u in HC.UPGRADES) {
         s.up[v][u] = Math.max(0, Math.min(HC.UPGRADES[u].max, num(s.up[v][u], 0)));
       }
-      var def = HC.defaultTune(v);
-      var t = s.tune[v] || {};
-      s.tune[v] = {};
-      for (var kn in HC.TUNING) {
-        var K = HC.TUNING[kn];
-        s.tune[v][kn] = Math.max(K.min, Math.min(K.max, num(t[kn], K.def)));
-      }
-      s.tune[v].drive = HC.DRIVE[t.drive] ? t.drive : def.drive;
     }
 
     // задания: списки пересобираются сами при смене дня/недели/месяца
@@ -117,7 +108,20 @@ window.HC = window.HC || {};
     for (var i = 0; i < HC.PLOTS.spots.length; i++) {
       var p = plots[i];
       if (p && HC.BUILDINGS[p.type]) {
-        fixed.push({ type: p.type, level: Math.max(1, Math.min(HC.BUILDINGS[p.type].max, num(p.level, 1))) });
+        var bd = HC.BUILDINGS[p.type];
+        var lv = Math.max(0, Math.min(bd.max, Math.floor(num(p.level, 1))));
+        var keep = { type: p.type, level: lv };
+        var b = p.build;
+        if (b && typeof b === 'object') {
+          var to = Math.max(1, Math.min(bd.max, Math.floor(num(b.to, lv + 1))));
+          var span = Math.max(1, num(b.span, HC.buildTimeOf(bd, to)));
+          var end = num(b.end, now());
+          // если часы перевели вперёд и обратно, стройка не должна зависнуть
+          if (end > now() + span * 1000 + 60000) end = now() + span * 1000;
+          if (to > lv) keep.build = { to: to, end: end, span: span };
+        }
+        // нулевой уровень без стройки — это просто пустой участок
+        fixed.push(keep.level < 1 && !keep.build ? null : keep);
       } else fixed.push(null);
     }
     s.base.plots = fixed;

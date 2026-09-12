@@ -21,7 +21,7 @@ window.HC = window.HC || {};
       this.trackId = trackId;
       this.track = track;
       this.terrain = new HC.Terrain(track, (Math.random() * 1e9) | 0, trackId);
-      this.car = new HC.Vehicle(st.vehicle, st.up[st.vehicle], this.terrain, track.gravity, st.tune[st.vehicle]);
+      this.car = new HC.Vehicle(st.vehicle, st.up[st.vehicle], this.terrain, track.gravity);
       this.cam = { x: this.car.pos.x, y: this.car.pos.y, z: 1 };
       this.coins = 0;
       this.ore = 0;
@@ -42,6 +42,7 @@ window.HC = window.HC || {};
       this.input = { throttle: 0 };
       this.rideMul = 1 + HC.Economy.workshopRide(st);
       this.prevX = this.car.pos.x;
+      this.km = 0;           // сколько километровых рубежей пройдено
       this.stuckT = 0;       // сколько стоим на месте, пытаясь ехать
       this.shake = 0;        // тряска камеры от удара
       this.slowT = 0;        // замедление времени на сальто
@@ -137,6 +138,24 @@ window.HC = window.HC || {};
       this._lastAir = car.airTime;
 
       if (!car.onGround && this.phase === 'run') this.airTotal += dt;
+
+      // Каждый километр рельеф становится злее — рубеж стоит отметить,
+      // и за риск немного платят.
+      if (this.phase === 'run') {
+        var km = Math.floor(car.distance / 1000);
+        if (km > this.km) {
+          this.km = km;
+          var kmGain = HC.ECON.kmBonus * km;
+          this.coins += kmGain;
+          this.floats.push({
+            x: car.pos.x, y: car.pos.y - 86, t: 0, big: true,
+            text: km + ' КМ · ЗЛЕЕ  +' + kmGain
+          });
+          HC.Audio.chime();
+        }
+      }
+
+      if (T.soft) this.sink(dt);
       this.hitTrees();
       this.collect();
       this.dust(dt);
@@ -149,14 +168,14 @@ window.HC = window.HC || {};
           if (this.demoWait > 1.6) { this.demoWait = 0; this.start(this.game, this.trackId, true); }
         }
         HC.Audio.engine(car.rpm || 0, Math.abs(thr), car.slipAmount || 0,
-                        Math.min(1, car.speed / 1300));
+                        Math.min(1, car.speed / 650));
         this.camFollow(dt);
         return;
       }
 
       // Застряли: машина может заклиниться в разломе — газ есть, движения
       // нет. Раньше заезд висел, пока не кончится топливо.
-      if (this.phase === 'run' && this.time > 1.5 && car.speed < 22 &&
+      if (this.phase === 'run' && this.time > 1.5 && car.speed < 14 &&
           (Math.abs(thr) > 0.1 || !car.onGround)) {
         this.stuckT += dt;
       } else {
@@ -170,18 +189,18 @@ window.HC = window.HC || {};
         else if (car.fuel <= 0) this.beginEnd('Кончилось топливо');
       } else if (this.phase === 'ending') {
         this.endTimer += dt;
-        var slow = car.speed < 40;
+        var slow = car.speed < 20;
         if (this.endTimer > (car.crashed ? 1.3 : 2.2) && (slow || this.endTimer > 7)) this.finish();
       }
 
       HC.Audio.engine(car.rpm || 0, Math.abs(thr), car.slipAmount || 0,
-                      Math.min(1, car.speed / 1300));
+                      Math.min(1, car.speed / 650));
       this.camFollow(dt);
     },
 
     camFollow: function (dt) {
       var car = this.car;
-      var lead = clamp(car.vel.x * 0.22, -160, 260);
+      var lead = clamp(car.vel.x * 0.26, -90, 150);
       var k = 1 - Math.pow(0.0025, dt);
       this.cam.x = lerp(this.cam.x, car.pos.x + lead, k);
       var drop = (this.viewH || 600) * 0.10 / this.cam.z;   // машина чуть ниже центра экрана
@@ -189,7 +208,7 @@ window.HC = window.HC || {};
 
       // На скорости и в высоком полёте камера отъезжает: видно, куда летишь,
       // и сама скорость читается телом, а не только цифрой.
-      var spd = Math.min(1, Math.abs(car.vel.x) / 1250);
+      var spd = Math.min(1, Math.abs(car.vel.x) / 620);
       var air = car.onGround ? 0 : Math.min(1, car.airTime / 1.3);
       var want = 1 - spd * 0.17 - air * 0.1;
       this.zoomK = lerp(this.zoomK, want, 1 - Math.pow(0.12, dt));
@@ -285,7 +304,39 @@ window.HC = window.HC || {};
       this.floats.push({ x: x, y: y, t: 0, text: (label ? label + ' +' : '+') + n });
     },
 
-    /* Дерево на дороге: снести можно, но машина резко теряет ход. */
+    /* Жидкий песок: колесо продавливает воронку. Стоишь и буксуешь —
+       тонешь; едешь — выгребаешь. Песок сам осыпается обратно, поэтому
+       трасса за спиной со временем затягивается. */
+    sink: function (dt) {
+      var T = this.terrain, car = this.car;
+      T.settle(dt);
+      if (this.phase !== 'run') return;
+      var calm = this.game.state.settings.calmMode;
+      for (var i = 0; i < car.wheels.length; i++) {
+        var w = car.wheels[i];
+        if (!w.contact) continue;
+        var soft = T.softness(w.pos.x);
+        if (soft <= 0.02) continue;
+        var slip = Math.abs(w.spin * w.r - car.vel.x);
+        var move = Math.abs(car.vel.x);
+        // большое колесо меньше режет песок — трак почти не тонет
+        var wide = 22 / Math.max(14, w.r);
+        var rate = soft * wide * (8 + slip * 0.05) * clamp(1 - move / 260, 0.10, 1);
+        T.dig(w.pos.x, rate * dt);
+        if (!calm && slip > 50 && Math.random() < dt * 16) {
+          this.particles.push({
+            x: w.pos.x - (car.vel.x >= 0 ? 1 : -1) * w.r * 0.6,
+            y: w.pos.y + w.r * 0.6,
+            vx: -car.vel.x * 0.25 + (Math.random() - 0.5) * 60,
+            vy: -30 - Math.random() * 90,
+            r: 3 + Math.random() * 5, t: 0, life: 0.5 + Math.random() * 0.5
+          });
+        }
+      }
+    },
+
+    /* Дерево на дороге: сбить можно, но ствол ложится поперёк дороги
+       и остаётся преградой — дальше его надо переползать. */
     hitTrees: function () {
       var T = this.terrain;
       if (!T.track.trees || this.phase !== 'run') { this.prevX = this.car.pos.x; return; }
@@ -300,7 +351,9 @@ window.HC = window.HC || {};
         var top = T.height(tr.x) - 74 * tr.s;
         if (car.pos.y < top) continue;                  // перелетел поверху
         if (!T.breakTree(tr.id)) continue;
-        car.vel.x *= 0.62;
+        // ствол ложится вперёд по ходу и становится бугром в рельефе
+        T.dropLog(tr.x + (car.vel.x >= 0 ? 1 : -1) * 170, tr.s);
+        car.vel.x *= 0.72;
         car.angVel += 0.8 * Math.sign(car.vel.x || 1);
         HC.Audio.crack();
         for (var p = 0; p < 7; p++) {
@@ -330,8 +383,9 @@ window.HC = window.HC || {};
         if (d < reach) {
           this.terrain.take(it);
           if (it.type === 'coin') {
-            // чем дальше уехал, тем дороже монетка
-            var val = HC.ECON.coinPickup + HC.ECON.coinPer100 * Math.floor(car.distance / 100);
+            // чем дальше уехал, тем дороже монетка — но не до бесконечности
+            var steps = Math.min(Math.floor(car.distance / 100), HC.ECON.coinPer100Max);
+            var val = HC.ECON.coinPickup + HC.ECON.coinPer100 * steps;
             this.addCoins(val, it.x, it.y);
             HC.Audio.coin();
           } else if (it.type === 'ore') {
@@ -510,23 +564,39 @@ window.HC = window.HC || {};
     /* Деревья, столбы и камни вдоль дороги */
     drawDecor: function (g, cam, W, H, P) {
       var T = this.terrain;
+      var x0 = cam.x - W / cam.z * 0.7, x1 = cam.x + W / cam.z * 0.7;
 
-      // деревья-препятствия: сломанные лежат
-      var trees = T.treesIn(cam.x - W / cam.z * 0.7, cam.x + W / cam.z * 0.7);
+      // хайвэй: отбойник по обочине, позади машины
+      T.drawRail(g, x0, x1, P);
+
+      // деревья-препятствия: от сбитого остаётся пенёк
+      var trees = T.treesIn(x0, x1);
       for (var ti = 0; ti < trees.length; ti++) {
         var tr = trees[ti];
         var ty = T.height(tr.x);
         g.save();
         g.translate(tr.x, ty);
         if (tr.broken) {
-          g.rotate(1.35);
-          g.globalAlpha = 0.75;
+          g.globalAlpha = 0.8;
+          g.strokeStyle = P.ink;
+          g.fillStyle = P.bodyShade || P.bodyFill;
+          g.lineWidth = 2.4;
+          g.beginPath();
+          g.moveTo(-7 * tr.s, 2); g.lineTo(-6 * tr.s, -13 * tr.s);
+          g.lineTo(6 * tr.s, -11 * tr.s); g.lineTo(7 * tr.s, 2);
+          g.closePath(); g.fill(); g.stroke();
         } else {
           HC.Decor.shadow(g, P, 20 * tr.s, 0.24);
+          HC.Decor.draw(g, tr.kind, P, tr.s, false);
         }
-        HC.Decor.draw(g, tr.kind, P, tr.s, false);
         g.restore();
         g.globalAlpha = 1;
+      }
+
+      // сами брёвна: через них и приходится переползать
+      if (T.hasLogs) {
+        var logs = T.logsIn(x0, x1);
+        for (var li = 0; li < logs.length; li++) T.drawLog(g, logs[li], P);
       }
 
       var list = T.decorIn(cam.x - W / cam.z * 0.7, cam.x + W / cam.z * 0.7);
@@ -590,10 +660,26 @@ window.HC = window.HC || {};
       for (var x = from; x < cam.x + W / cam.z; x += every) {
         if (x < every) continue;
         var y = T.height(x);
+        var m = Math.round(x / HC.PPM);
+        if (m % 1000 === 0) {
+          // километр — рубеж, за которым трасса становится злее
+          g.globalAlpha = 0.5;
+          g.lineWidth = 2.5;
+          g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - 64); g.stroke();
+          g.beginPath();
+          g.moveTo(x, y - 64); g.lineTo(x + 26, y - 57); g.lineTo(x, y - 50);
+          g.closePath(); g.fill();
+          g.globalAlpha = 0.7;
+          g.font = '700 15px ui-sans-serif, system-ui, sans-serif';
+          g.fillText(m / 1000 + ' км', x, y - 74);
+          g.font = '600 13px ui-sans-serif, system-ui, sans-serif';
+          g.lineWidth = 2;
+          continue;
+        }
         g.globalAlpha = 0.35;
         g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - 30); g.stroke();
         g.globalAlpha = 0.55;
-        g.fillText(Math.round(x / HC.PPM) + ' м', x, y - 38);
+        g.fillText(m + ' м', x, y - 38);
       }
       g.globalAlpha = 1;
       g.restore();
