@@ -42,6 +42,11 @@ window.HC = window.HC || {};
       this.input = { throttle: 0 };
       this.rideMul = 1 + HC.Economy.workshopRide(st);
       this.prevX = this.car.pos.x;
+      this.stuckT = 0;       // сколько стоим на месте, пытаясь ехать
+      this.shake = 0;        // тряска камеры от удара
+      this.slowT = 0;        // замедление времени на сальто
+      this.zoomK = 1;        // камера отъезжает на скорости
+      this.wasAir = false;
       HC.Audio.engineStart();
     },
 
@@ -51,8 +56,17 @@ window.HC = window.HC || {};
     update: function (dt, input) {
       if (!this.active || this.paused) return;
       dt = Math.min(dt, 1 / 30);
+
+      // На большом сальто время чуть тянется — успеваешь увидеть, что делаешь.
+      // Тихо и без рывка: коэффициент сам сползает к единице.
+      if (this.slowT > 0) this.slowT = Math.max(0, this.slowT - dt * 1.5);
+      dt *= 1 - 0.38 * this.slowT;
+      if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 3.4);
+
       this.time += dt;
       var car = this.car, T = this.terrain;
+      var wasAir = !car.onGround;
+      var fallV = car.vel.y;
 
       if (this.demo) {
         input = { throttle: this.autoThrottle() };
@@ -60,6 +74,39 @@ window.HC = window.HC || {};
       }
       var thr = this.phase === 'run' ? input.throttle : 0;
       car.update(dt, { throttle: thr });
+
+      // приземление: тряска, пыль из-под колёс и глухой удар
+      if (wasAir && car.onGround && fallV > 240) {
+        var force = Math.min(1, (fallV - 240) / 900);
+        // на заставке трясти незачем — там просто спокойно едет машина
+        if (!this.demo) this.shake = Math.max(this.shake, 0.35 + force * 0.65);
+        HC.Audio.land(force);
+        if (!this.game.state.settings.calmMode) {
+          // хлопок по земле: расходящееся кольцо в точке касания
+          var cw = car.wheels[0];
+          for (var ri = 0; ri < car.wheels.length; ri++) {
+            if (car.wheels[ri].contact) { cw = car.wheels[ri]; break; }
+          }
+          this.particles.push({
+            ring: true, x: cw.pos.x, y: cw.pos.y + cw.r * 0.8,
+            vx: 0, vy: 0, r: 10, t: 0, life: 0.42 + force * 0.2, force: force
+          });
+          for (var pi = 0; pi < car.wheels.length; pi++) {
+            var pw = car.wheels[pi];
+            var burst = 5 + Math.round(force * 9);
+            for (var pj = 0; pj < burst; pj++) {
+              this.particles.push({
+                x: pw.pos.x + (Math.random() - 0.5) * 16,
+                y: pw.pos.y + pw.r * 0.75,
+                vx: (Math.random() - 0.5) * 170 - car.vel.x * 0.05,
+                vy: -50 - Math.random() * 130 * (0.4 + force),
+                r: 5 + Math.random() * 9, t: 0, life: 0.6 + Math.random() * 0.6,
+                big: true
+              });
+            }
+          }
+        }
+      }
 
       // сальто и полёт
       if (!car.onGround) {
@@ -76,6 +123,7 @@ window.HC = window.HC || {};
             text: (FLIP_NAMES[Math.min(n, FLIP_NAMES.length) - 1]) + '  +' + gain
           });
           HC.Audio.flip(n);
+          if (n >= 2) this.slowT = 1;   // с двойного сальто время тянется
         }
       } else {
         if (car.airTime === 0 && this._lastAir > HC.ECON.airMin && !car.crashed && this.airFlips === 0) {
@@ -106,9 +154,19 @@ window.HC = window.HC || {};
         return;
       }
 
+      // Застряли: машина может заклиниться в разломе — газ есть, движения
+      // нет. Раньше заезд висел, пока не кончится топливо.
+      if (this.phase === 'run' && this.time > 1.5 && car.speed < 22 &&
+          (Math.abs(thr) > 0.1 || !car.onGround)) {
+        this.stuckT += dt;
+      } else {
+        this.stuckT = 0;
+      }
+
       // чем кончился заезд
       if (this.phase === 'run') {
         if (car.crashed) this.beginEnd('Приехали');
+        else if (this.stuckT > 6) this.beginEnd('Застряли');
         else if (car.fuel <= 0) this.beginEnd('Кончилось топливо');
       } else if (this.phase === 'ending') {
         this.endTimer += dt;
@@ -128,6 +186,13 @@ window.HC = window.HC || {};
       this.cam.x = lerp(this.cam.x, car.pos.x + lead, k);
       var drop = (this.viewH || 600) * 0.10 / this.cam.z;   // машина чуть ниже центра экрана
       this.cam.y = lerp(this.cam.y, car.pos.y - drop, 1 - Math.pow(0.02, dt));
+
+      // На скорости и в высоком полёте камера отъезжает: видно, куда летишь,
+      // и сама скорость читается телом, а не только цифрой.
+      var spd = Math.min(1, Math.abs(car.vel.x) / 1250);
+      var air = car.onGround ? 0 : Math.min(1, car.airTime / 1.3);
+      var want = 1 - spd * 0.17 - air * 0.1;
+      this.zoomK = lerp(this.zoomK, want, 1 - Math.pow(0.12, dt));
     },
 
     /* Водитель для заставки: в полёте выравнивается, на спуске придерживает */
@@ -306,9 +371,11 @@ window.HC = window.HC || {};
       for (i = this.particles.length - 1; i >= 0; i--) {
         p = this.particles[i];
         p.t += dt;
-        p.x += p.vx * dt; p.y += p.vy * dt;
-        p.vy += 40 * dt;
-        p.r += dt * 8;
+        if (!p.ring) {
+          p.x += p.vx * dt; p.y += p.vy * dt;
+          p.vy += 40 * dt;
+          p.r += dt * 8;
+        }
         if (p.t > p.life) this.particles.splice(i, 1);
       }
       for (i = this.floats.length - 1; i >= 0; i--) {
@@ -323,7 +390,19 @@ window.HC = window.HC || {};
     draw: function (g, W, H, P) {
       var T = this.terrain, cam = this.cam;
       this.viewH = H;
-      cam.z = clamp(Math.min(W / 700, H / 760), 0.50, 1.35);
+      cam.z = clamp(Math.min(W / 700, H / 760) * (this.zoomK || 1), 0.44, 1.35);
+
+      // Тряска — в экранных координатах, на физику не влияет. Кадр при этом
+      // чуть раздвигаем, иначе по краям вылезала бы пустота.
+      var sh = this.shake || 0;
+      g.save();
+      if (sh > 0.001) {
+        var kz = 1 + 0.035 * sh;
+        g.translate(W / 2, H / 2);
+        g.scale(kz, kz);
+        g.translate(-W / 2 + Math.sin(this.time * 63) * 10 * sh,
+                    -H / 2 + Math.sin(this.time * 48 + 1.7) * 12 * sh);
+      }
 
       T.drawSky(g, W, H, P);
       HC.drawSun(g, W, H, P, cam.x, this.game.state.settings.theme === 'dark');
@@ -350,9 +429,25 @@ window.HC = window.HC || {};
       g.fillStyle = P.dust;
       for (i = 0; i < this.particles.length; i++) {
         var p = this.particles[i];
-        g.globalAlpha = (1 - p.t / p.life) * 0.5;
+        var u = p.t / p.life;
+        if (p.ring) {
+          // хлопок: низкое расходящееся кольцо, как пыль из-под колёс
+          var rr = 16 + (70 + 60 * p.force) * u;
+          g.save();
+          g.globalAlpha = (1 - u) * 0.34;
+          g.strokeStyle = P.ink;
+          g.lineWidth = 2.5 + 4 * (1 - u);
+          g.translate(p.x, p.y);
+          g.scale(1, 0.3);
+          g.beginPath(); g.arc(0, 0, rr, 0, Math.PI * 2); g.stroke();
+          g.restore();
+          continue;
+        }
+        g.globalAlpha = (1 - u) * (p.big ? 0.62 : 0.4);
+        g.fillStyle = p.big ? P.hatch : P.dust;
         g.beginPath(); g.arc(p.x, p.y, p.r, 0, Math.PI * 2); g.fill();
       }
+      g.fillStyle = P.dust;
       g.globalAlpha = 1;
 
       this.car.draw(g, P);
@@ -386,6 +481,7 @@ window.HC = window.HC || {};
 
       // передний план уезжает быстрее машины — отсюда ощущение скорости
       this.drawForeground(g, cam, W, H, P);
+      g.restore();            // конец тряски
       HC.drawVignette(g, W, H, P);
     },
 

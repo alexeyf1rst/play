@@ -349,6 +349,34 @@ window.HC = window.HC || {};
       src.connect(filt); filt.connect(g); g.connect(sfxBus);
       src.start(t); src.stop(t + 0.9);
     },
+    /* Приземление: глухой удар, громкость по силе */
+    land: function (force) {
+      if (!ctx || !settings.sfx) return;
+      var f = Math.max(0.15, Math.min(1, force || 0.5));
+      var t = ctx.currentTime;
+      var src = ctx.createBufferSource();
+      src.buffer = noiseBuffer(0.4);
+      var filt = ctx.createBiquadFilter();
+      filt.type = 'lowpass';
+      filt.frequency.setValueAtTime(420, t);
+      filt.frequency.exponentialRampToValueAtTime(80, t + 0.26);
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0.05 + 0.09 * f, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      src.connect(filt); filt.connect(g); g.connect(sfxBus);
+      src.start(t); src.stop(t + 0.35);
+      // низкий тон вместе с ударом — вес машины
+      var osc = ctx.createOscillator(), og = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(70 + 40 * f, t);
+      osc.frequency.exponentialRampToValueAtTime(42, t + 0.22);
+      og.gain.setValueAtTime(0.0001, t);
+      og.gain.exponentialRampToValueAtTime(0.03 + 0.05 * f, t + 0.01);
+      og.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      osc.connect(og); og.connect(sfxBus);
+      osc.start(t); osc.stop(t + 0.35);
+    },
+
     crack: function () {
       if (!ctx || !settings.sfx) return;
       var t = ctx.currentTime;

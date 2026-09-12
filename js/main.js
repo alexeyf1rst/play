@@ -190,7 +190,7 @@ window.HC = window.HC || {};
         if (p.moved > 10) return;                    // это было перетаскивание
         var rect = c.getBoundingClientRect();
         var i = HC.Base.hitTest(p.sx - rect.left, p.sy - rect.top, self.state);
-        if (i >= 0) { HC.Audio.click(); HC.UI.openPlot(i); }
+        if (i >= 0) { HC.Audio.click(); HC.Base.pingPad(i); HC.UI.openPlot(i); }
       }
       c.addEventListener('pointerup', endPtr);
       c.addEventListener('pointercancel', endPtr);

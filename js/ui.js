@@ -81,6 +81,7 @@ window.HC = window.HC || {};
         var got = HC.Economy.collect(G.state);
         if (got.coins || got.ore) {
           HC.Quests.report(G.state, 'collect', 1);
+          HC.Base.burst(G.state, got);
           HC.Audio.build();
           UI.toast('Собрано: ' + money(got.coins) + ' монет' + (got.ore ? ', ' + money(got.ore) + ' руды' : ''));
         }
@@ -425,6 +426,7 @@ window.HC = window.HC || {};
                 if (!pay(HC.costOf(d, 0), HC.oreCostOf(d, 0))) return;
                 G.state.base.plots[index] = { type: bid, level: 1 };
                 HC.Quests.report(G.state, 'build', 1);
+                HC.Base.pop(index);
                 HC.Audio.build();
                 UI.toast(d.name + ' построена');
                 HC.save(G.state, true);
@@ -438,6 +440,7 @@ window.HC = window.HC || {};
               if (!pay(HC.costOf(d, p.level), HC.oreCostOf(d, p.level))) return;
               p.level++;
               HC.Quests.report(G.state, 'build', 1);
+              HC.Base.pop(index);
               HC.Audio.build();
               HC.save(G.state, true);
               UI.refresh();

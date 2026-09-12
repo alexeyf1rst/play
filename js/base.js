@@ -212,6 +212,9 @@ window.HC = window.HC || {};
     W: 1, H: 1,
     dragging: false, dragMoved: 0,
     spots: null, camInit: false,
+    fx: [],          // летящие монетки и пыль — в экранных координатах
+    pops: {},        // участок → фаза подскока после стройки
+    ping: null,      // круг по нажатому участку
 
     /* Участки: место на сетке считаем один раз */
     places: function () {
@@ -283,6 +286,15 @@ window.HC = window.HC || {};
     },
 
     /* Мир → экран (обратное к toWorld) */
+    /* Что попадает в кадр: всё, что снаружи, рисовать незачем */
+    viewBox: function () {
+      var vw = this.W / this.zoom, vh = this.H / this.zoom;
+      return {
+        x0: this.cam.x - vw / 2 - 160, x1: this.cam.x + vw / 2 + 160,
+        y0: this.cam.y - vh / 2 - 260, y1: this.cam.y + vh / 2 + 120
+      };
+    },
+
     toScreen: function (x, y) {
       return {
         x: (x - this.cam.x) * this.zoom + this.W / 2,
@@ -318,7 +330,118 @@ window.HC = window.HC || {};
       return -1;
     },
 
-    update: function (dt) { this.t += dt; },
+    update: function (dt) {
+      this.t += dt;
+      var i;
+      for (i = this.fx.length - 1; i >= 0; i--) {
+        var f = this.fx[i];
+        f.t += dt;
+        if (f.t > f.life) this.fx.splice(i, 1);
+      }
+      for (var k in this.pops) {
+        this.pops[k] -= dt * 1.9;
+        if (this.pops[k] <= 0) delete this.pops[k];
+      }
+      if (this.ping) {
+        this.ping.t += dt;
+        if (this.ping.t > 0.5) this.ping = null;
+      }
+    },
+
+    /* Сбор: монетки летят от построек к счётчику. Видно, откуда деньги. */
+    burst: function (state, got) {
+      if (state.settings.calmMode) return;
+      var spots = this.places(), self = this;
+      function target(id) {
+        var e = document.getElementById(id);
+        if (!e) return { x: self.W * 0.12, y: 34 };
+        var r = e.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      }
+      var toC = target('coins'), toO = target('ore');
+      var n = 0;
+      for (var i = 0; i < spots.length && i < state.base.unlocked; i++) {
+        var pl = state.base.plots[i];
+        if (!pl) continue;
+        var ore = pl.type === 'drill';
+        var pays = ore || pl.type === 'mine' || pl.type === 'smelter';
+        if (!pays) continue;
+        if ((ore ? got.ore : got.coins) < 1) continue;
+        var from = this.toScreen(spots[i].x, spots[i].y - 60);
+        var to = ore ? toO : toC;
+        var cnt = 3;
+        for (var j = 0; j < cnt && n < 60; j++, n++) {
+          this.fx.push({
+            kind: ore ? 'ore' : 'coin',
+            x0: from.x + (Math.random() - 0.5) * 34,
+            y0: from.y + (Math.random() - 0.5) * 20,
+            x1: to.x, y1: to.y,
+            t: -j * 0.07, life: 0.75 + Math.random() * 0.2,
+            arc: 60 + Math.random() * 70
+          });
+        }
+      }
+    },
+
+    /* Постройка выросла: подскок и пыль по площадке */
+    pop: function (index) {
+      var spots = this.places(), s = spots[index];
+      if (!s) return;
+      this.pops[index] = 1;
+      if (HC.Game && HC.Game.state && HC.Game.state.settings.calmMode) return;
+      var c = this.toScreen(s.x, s.y);
+      for (var i = 0; i < 14; i++) {
+        var a2 = Math.random() * Math.PI * 2;
+        this.fx.push({
+          kind: 'dust',
+          x0: c.x, y0: c.y,
+          x1: c.x + Math.cos(a2) * (50 + Math.random() * 60) * this.zoom,
+          y1: c.y + Math.sin(a2) * (24 + Math.random() * 26) * this.zoom,
+          t: 0, life: 0.55 + Math.random() * 0.35, arc: 0,
+          r: 3 + Math.random() * 5
+        });
+      }
+    },
+
+    /* Нажали по участку — круг по площадке, чтобы попадание читалось */
+    pingPad: function (index) {
+      if (this.places()[index]) this.ping = { i: index, t: 0 };
+    },
+
+    /* Эффекты поверх сцены, в экранных координатах */
+    drawFx: function (g, P) {
+      if (!this.fx.length) return;
+      g.save();
+      for (var i = 0; i < this.fx.length; i++) {
+        var f = this.fx[i];
+        if (f.t < 0) continue;
+        var u = Math.min(1, f.t / f.life);
+        var e = 1 - Math.pow(1 - u, 2.2);
+        var x = f.x0 + (f.x1 - f.x0) * e;
+        var y = f.y0 + (f.y1 - f.y0) * e - Math.sin(Math.PI * e) * (f.arc || 0);
+        if (f.kind === 'dust') {
+          g.globalAlpha = (1 - u) * 0.35;
+          g.fillStyle = P.hatch;
+          g.beginPath(); g.arc(x, y, (f.r || 4) * (0.6 + u), 0, 6.3); g.fill();
+          continue;
+        }
+        g.globalAlpha = u > 0.8 ? (1 - u) * 5 : 1;
+        g.strokeStyle = P.ink;
+        g.fillStyle = P.bodyHi || P.bodyFill;
+        g.lineWidth = 2;
+        if (f.kind === 'ore') {
+          g.beginPath();
+          g.moveTo(x, y - 6); g.lineTo(x + 6, y); g.lineTo(x, y + 6); g.lineTo(x - 6, y);
+          g.closePath(); g.fill(); g.stroke();
+        } else {
+          g.beginPath(); g.arc(x, y, 6, 0, 6.3); g.fill(); g.stroke();
+          g.globalAlpha *= 0.6;
+          g.beginPath(); g.arc(x, y, 2.4, 0, 6.3); g.stroke();
+        }
+      }
+      g.restore();
+      g.globalAlpha = 1;
+    },
 
     /* --- отрисовка ---------------------------------------- */
     draw: function (g, W, H, P, state) {
@@ -351,6 +474,7 @@ window.HC = window.HC || {};
       this.drawRopeway(g, P);
       g.restore();
 
+      this.drawFx(g, P);
       HC.drawVignette(g, W, H, P);
     },
 
@@ -482,10 +606,12 @@ window.HC = window.HC || {};
     /* Площадки участков: приподнятые пятачки с бортиком */
     drawPads: function (g, P, state) {
       var spots = this.places(), self = this;
+      var vb = this.viewBox();
       spots.forEach(function (s, i) {
         var open = i < state.base.unlocked;
         var next = i === state.base.unlocked;
         if (!open && !next) return;
+        if (s.x < vb.x0 || s.x > vb.x1 || s.y < vb.y0 || s.y > vb.y1) return;
         var a = iso(s.gx, s.gy), b = iso(s.gx + 2, s.gy), c = iso(s.gx + 2, s.gy + 2), d = iso(s.gx, s.gy + 2);
         var lift = open ? 13 : 4;
         g.save();
@@ -518,6 +644,18 @@ window.HC = window.HC || {};
         g.globalAlpha = 1;
         if (open && !state.base.plots[i]) self.drawEmpty(g, s, P);
         if (next) self.drawLocked(g, s, P);
+        if (self.ping && self.ping.i === i) {
+          var pu = self.ping.t / 0.5;
+          g.save();
+          g.globalAlpha = (1 - pu) * 0.5;
+          g.strokeStyle = P.ink;
+          g.lineWidth = 3;
+          g.translate(s.x, s.y - TH * 0.5 - lift);
+          g.scale(1, 0.5);
+          g.beginPath(); g.arc(0, 0, 40 + pu * 80, 0, 6.3); g.stroke();
+          g.restore();
+          g.globalAlpha = 1 - s.fade * 0.6;
+        }
       });
     },
 
@@ -555,128 +693,251 @@ window.HC = window.HC || {};
       g.globalAlpha = 1;
     },
 
-    /* Связи: труба от бура к складу, рельсы от шахты к складу и линия
-       от ветряка. Рисуем по земле, до построек. */
+    /* Сеть: связано всё. У каждой постройки — подъезд к улице и провод в
+       общую линию (её корень — ветряк, он же питает долину). Сверху лежит
+       логистика по смыслу: руда по трубе к плавильне, добыча по рельсам
+       на склад. Маршруты идут по улицам, а не наискось через участки. */
     drawLinks: function (g, P, state) {
-      var spots = this.places(), here = [], i;
+      var spots = this.places(), here = [], i, k, self = this;
       for (i = 0; i < spots.length && i < state.base.unlocked; i++) {
         var pl = state.base.plots[i];
-        if (pl) here.push({ x: spots[i].x, y: spots[i].y, gx: spots[i].gx, gy: spots[i].gy,
-                            type: pl.type, level: pl.level, fade: spots[i].fade });
+        if (pl) {
+          here.push({ gx: spots[i].gx, gy: spots[i].gy, x: spots[i].x, y: spots[i].y,
+                      type: pl.type, level: pl.level, fade: spots[i].fade });
+        }
       }
-      if (here.length < 2) return;
+      if (!here.length) return;
 
-      function nearest(from, type) {
-        var best = null, bd = 1e9;
-        here.forEach(function (o) {
-          if (o.type !== type || o === from) return;
-          var d = Math.hypot(o.x - from.x, o.y - from.y);
-          if (d < bd) { bd = d; best = o; }
+      function centre(o) { return { gx: o.gx + 1, gy: o.gy + 1 }; }
+      /* Маршрут по улицам: вышли на дорогу перед участком, прошли вдоль
+         неё и зашли к соседу. */
+      function route(a, b) {
+        var A = centre(a), B = centre(b);
+        var street = a.gx + 2.5;
+        var pts = [A, { gx: street, gy: A.gy }, { gx: street, gy: B.gy }, B];
+        var out = [];
+        pts.forEach(function (q, n) {
+          if (n && Math.abs(q.gx - pts[n - 1].gx) < 0.01 && Math.abs(q.gy - pts[n - 1].gy) < 0.01) return;
+          out.push(iso(q.gx, q.gy));
         });
-        return best ? { o: best, d: bd } : null;
-      }
-
-      // Маршрут по дорогам: из центра участка выходим на дорожную
-      // клетку, идём вдоль неё и заходим к соседу. Так связи лежат по
-      // улицам, а не режут долину наискось.
-      function route(a2, b2) {
-        var pts = [
-          { gx: a2.gx + 1, gy: a2.gy + 1 },
-          { gx: a2.gx, gy: a2.gy + 1 },
-          { gx: a2.gx, gy: b2.gy + 1 },
-          { gx: b2.gx + 1, gy: b2.gy + 1 }
-        ];
-        return pts.map(function (q) { return iso(q.gx, q.gy); });
+        return out;
       }
       function polyline(pts, lift) {
         g.beginPath();
-        pts.forEach(function (q, k) {
-          if (k === 0) g.moveTo(q.x, q.y - lift); else g.lineTo(q.x, q.y - lift);
+        pts.forEach(function (q, n) {
+          if (n === 0) g.moveTo(q.x, q.y - lift); else g.lineTo(q.x, q.y - lift);
         });
         g.stroke();
+      }
+      function nearest(from, types) {
+        var best = null, bd = 1e9;
+        here.forEach(function (o) {
+          if (o === from || types.indexOf(o.type) < 0) return;
+          var d = Math.abs(o.gx - from.gx) + Math.abs(o.gy - from.gy);
+          if (d < bd) { bd = d; best = o; }
+        });
+        return best;
+      }
+
+      /* Точка на маршруте: нужна, чтобы что-то по нему двигалось */
+      function along(pts, u, lift) {
+        var seg = [], total = 0, i2;
+        for (i2 = 0; i2 < pts.length - 1; i2++) {
+          var L = Math.hypot(pts[i2 + 1].x - pts[i2].x, pts[i2 + 1].y - pts[i2].y);
+          seg.push(L); total += L;
+        }
+        if (total < 1) return null;
+        var d = u * total, j2 = 0;
+        while (j2 < seg.length - 1 && d > seg[j2]) { d -= seg[j2]; j2++; }
+        var f2 = seg[j2] ? d / seg[j2] : 0;
+        return {
+          x: pts[j2].x + (pts[j2 + 1].x - pts[j2].x) * f2,
+          y: pts[j2].y + (pts[j2 + 1].y - pts[j2].y) * f2 - lift,
+          back: pts[j2 + 1].x < pts[j2].x
+        };
       }
 
       g.save();
       g.lineCap = 'round';
       g.lineJoin = 'round';
 
-      // труба от бура к складу: на опорах над землёй
+      // 1. подъезд от каждой постройки к улице перед ней
+      g.strokeStyle = P.groundTop || P.ground;
+      g.globalAlpha = 0.85;
+      g.lineWidth = 26;
       here.forEach(function (o) {
-        if (o.type !== 'drill') return;
-        var to = nearest(o, 'storage');
-        if (!to || to.d > 700) return;
-        var pts = route(o, to.o);
-        g.strokeStyle = P.ink;
-        g.globalAlpha = 0.4;
-        g.lineWidth = 4;
-        polyline(pts, 20);
-        g.lineWidth = 1.6;
-        for (var k = 0; k < pts.length - 1; k++) {
-          var A = pts[k], B = pts[k + 1];
-          var n = Math.max(1, Math.round(Math.hypot(B.x - A.x, B.y - A.y) / 64));
-          for (var j = 0; j <= n; j++) {
-            var f = j / n;
-            var px = A.x + (B.x - A.x) * f, py = A.y + (B.y - A.y) * f;
-            g.beginPath(); g.moveTo(px, py - 20); g.lineTo(px, py); g.stroke();
-          }
-        }
+        var a = iso(o.gx + 1, o.gy + 1), b = iso(o.gx + 2.6, o.gy + 1);
+        g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
       });
-
-      // рельсы от шахты к складу
+      g.strokeStyle = P.hatch;
+      g.globalAlpha = 0.16;
+      g.lineWidth = 1;
+      g.setLineDash([5, 9]);
       here.forEach(function (o) {
-        if (o.type !== 'mine') return;
-        var to = nearest(o, 'storage');
-        if (!to || to.d > 700) return;
-        var pts = route(o, to.o);
-        g.strokeStyle = P.ink;
-        g.globalAlpha = 0.28;
-        g.lineWidth = 1.6;
-        polyline(pts, 3);
-        polyline(pts, 8);
-        for (var k2 = 0; k2 < pts.length - 1; k2++) {
-          var A2 = pts[k2], B2 = pts[k2 + 1];
-          var len = Math.hypot(B2.x - A2.x, B2.y - A2.y);
-          var m = Math.max(1, Math.round(len / 15));
-          for (var j2 = 0; j2 <= m; j2++) {
-            var f2 = j2 / m;
-            var qx = A2.x + (B2.x - A2.x) * f2, qy = A2.y + (B2.y - A2.y) * f2;
-            g.beginPath(); g.moveTo(qx, qy - 2); g.lineTo(qx, qy - 9); g.stroke();
-          }
-        }
+        var a = iso(o.gx + 1, o.gy + 1), b = iso(o.gx + 2.6, o.gy + 1);
+        g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
       });
+      g.setLineDash([]);
+      g.globalAlpha = 1;
 
-      // линия от ветряка: только к соседним участкам, иначе получается паутина
-      here.forEach(function (mill) {
-        if (mill.type !== 'windmill') return;
-        here.forEach(function (o) {
-          if (o === mill) return;
-          if (Math.abs(o.gx - mill.gx) > 3 || Math.abs(o.gy - mill.gy) > 3) return;
-          g.strokeStyle = P.ink;
-          g.globalAlpha = 0.26;
-          g.lineWidth = 1.3;
-          var ay = mill.y - 104, by = o.y - 58;
-          g.beginPath();
-          g.moveTo(mill.x, ay);
-          g.quadraticCurveTo((mill.x + o.x) / 2, (ay + by) / 2 + 18, o.x, by);
-          g.stroke();
-          g.globalAlpha = 0.32;
+      // 2. логистика: труба с рудой и рельсы с добычей
+      here.forEach(function (o) {
+        var to = null, kind = null;
+        if (o.type === 'drill') { to = nearest(o, ['smelter', 'storage']); kind = 'pipe'; }
+        else if (o.type === 'mine') { to = nearest(o, ['storage', 'depot']); kind = 'rail'; }
+        else if (o.type === 'smelter') { to = nearest(o, ['storage', 'depot']); kind = 'rail'; }
+        else if (o.type === 'depot') { to = nearest(o, ['storage']); kind = 'rail'; }
+        if (!to) return;
+        var pts = route(o, to);
+        g.strokeStyle = P.ink;
+        if (kind === 'pipe') {
+          g.globalAlpha = 0.4;
+          g.lineWidth = 4;
+          polyline(pts, 20);
+          // руда идёт по трубе: бегущий пунктир вдоль неё
+          g.globalAlpha = 0.5;
           g.lineWidth = 2;
-          g.beginPath(); g.moveTo(o.x, o.y - 8); g.lineTo(o.x, by - 4); g.stroke();
-        });
+          g.strokeStyle = P.bodyHi || P.bodyFill;
+          g.setLineDash([7, 15]);
+          g.lineDashOffset = -self.t * 26;
+          polyline(pts, 20);
+          g.setLineDash([]);
+          g.lineDashOffset = 0;
+          g.strokeStyle = P.ink;
+          g.globalAlpha = 0.4;
+          g.lineWidth = 1.6;
+          for (k = 0; k < pts.length - 1; k++) {
+            var A = pts[k], B = pts[k + 1];
+            var n1 = Math.max(1, Math.round(Math.hypot(B.x - A.x, B.y - A.y) / 60));
+            for (var j = 0; j <= n1; j++) {
+              var f = j / n1;
+              var px = A.x + (B.x - A.x) * f, py = A.y + (B.y - A.y) * f;
+              g.beginPath(); g.moveTo(px, py - 20); g.lineTo(px, py); g.stroke();
+            }
+          }
+        } else {
+          g.globalAlpha = 0.3;
+          g.lineWidth = 1.6;
+          polyline(pts, 3);
+          polyline(pts, 8);
+          // по рельсам катится вагонетка с добычей
+          var cu = (self.t * 0.055 + (o.gx + o.gy) * 0.13) % 1;
+          var cp = along(pts, cu, 6);
+          if (cp) {
+            g.save();
+            g.globalAlpha = 1;
+            g.translate(cp.x, cp.y);
+            g.scale(cp.back ? -0.62 : 0.62, 0.62);
+            g.strokeStyle = P.ink;
+            g.lineWidth = 3;
+            g.fillStyle = P.hatch;
+            g.beginPath();
+            g.moveTo(-11, -20); g.quadraticCurveTo(0, -30, 11, -20);
+            g.closePath(); g.fill();
+            g.fillStyle = P.bodyFill;
+            g.beginPath();
+            g.moveTo(-15, -21); g.lineTo(15, -21); g.lineTo(12, -5); g.lineTo(-12, -5);
+            g.closePath(); g.fill(); g.stroke();
+            g.lineWidth = 2.4;
+            g.beginPath(); g.arc(-8, -3, 3.4, 0, 6.3); g.stroke();
+            g.beginPath(); g.arc(8, -3, 3.4, 0, 6.3); g.stroke();
+            g.restore();
+            g.globalAlpha = 0.3;
+            g.strokeStyle = P.ink;
+            g.lineWidth = 1.6;
+          }
+          for (k = 0; k < pts.length - 1; k++) {
+            var A2 = pts[k], B2 = pts[k + 1];
+            var m = Math.max(1, Math.round(Math.hypot(B2.x - A2.x, B2.y - A2.y) / 15));
+            for (var j2 = 0; j2 <= m; j2++) {
+              var f2 = j2 / m;
+              var qx = A2.x + (B2.x - A2.x) * f2, qy = A2.y + (B2.y - A2.y) * f2;
+              g.beginPath(); g.moveTo(qx, qy - 2); g.lineTo(qx, qy - 9); g.stroke();
+            }
+          }
+        }
       });
+
+      // 3. общая линия: остовное дерево по всем постройкам, корень — ветряк.
+      // Так в сети оказывается каждая постройка и ни одной лишней жилы.
+      if (here.length > 1) {
+        var root = 0;
+        for (i = 0; i < here.length; i++) if (here[i].type === 'windmill') { root = i; break; }
+        var used = [root], left = [];
+        for (i = 0; i < here.length; i++) if (i !== root) left.push(i);
+        var edges = [];
+        while (left.length) {
+          var bi = 0, bj = 0, bd = 1e9;
+          for (i = 0; i < used.length; i++) {
+            for (k = 0; k < left.length; k++) {
+              var a3 = here[used[i]], b3 = here[left[k]];
+              var d = Math.abs(a3.gx - b3.gx) + Math.abs(a3.gy - b3.gy);
+              if (d < bd) { bd = d; bi = used[i]; bj = k; }
+            }
+          }
+          edges.push([bi, left[bj]]);
+          used.push(left[bj]);
+          left.splice(bj, 1);
+        }
+        var hasMill = here[root].type === 'windmill';
+        edges.forEach(function (e) {
+          var a4 = here[e[0]], b4 = here[e[1]];
+          var pts = route(a4, b4);
+          var lift = 92;
+          g.strokeStyle = P.ink;
+          // столбы на изломах
+          g.globalAlpha = 0.34;
+          g.lineWidth = 2.2;
+          pts.forEach(function (q, n) {
+            if (n === 0 || n === pts.length - 1) return;
+            g.beginPath();
+            g.moveTo(q.x, q.y); g.lineTo(q.x, q.y - lift);
+            g.moveTo(q.x - 8, q.y - lift + 8); g.lineTo(q.x + 8, q.y - lift + 8);
+            g.stroke();
+          });
+          // провод с провисом между точками; концы садятся на вводы
+          g.globalAlpha = hasMill ? 0.42 : 0.3;
+          g.lineWidth = 1.5;
+          for (var n2 = 0; n2 < pts.length - 1; n2++) {
+            var A5 = pts[n2], B5 = pts[n2 + 1];
+            var ax = n2 === 0 ? A5.x + 30 : A5.x;
+            var bx = n2 === pts.length - 2 ? B5.x + 30 : B5.x;
+            var ay = A5.y - (n2 === 0 ? 96 : lift - 8);
+            var by = B5.y - (n2 === pts.length - 2 ? 96 : lift - 8);
+            g.beginPath();
+            g.moveTo(ax, ay);
+            g.quadraticCurveTo((ax + bx) / 2, (ay + by) / 2 + 14, bx, by);
+            g.stroke();
+          }
+        });
+
+        // ввод в каждую постройку — по одному на дом, а не на каждую жилу
+        g.globalAlpha = 0.34;
+        g.lineWidth = 2.2;
+        here.forEach(function (o) {
+          g.beginPath();
+          g.moveTo(o.x + 30, o.y - 6); g.lineTo(o.x + 30, o.y - 96);
+          g.moveTo(o.x + 24, o.y - 90); g.lineTo(o.x + 36, o.y - 90);
+          g.stroke();
+        });
+      }
 
       g.restore();
       g.globalAlpha = 1;
     },
+
     /* Всё, что стоит на земле — одним списком, чтобы отсортировать по
        глубине: ближнее закрывает дальнее, как и должно быть в изометрии. */
     collect: function (state) {
       var out = [], spots = this.places(), self = this;
+      var vb = this.viewBox();
+      function seen(x, y) { return x > vb.x0 && x < vb.x1 && y > vb.y0 && y < vb.y1; }
 
       spots.forEach(function (s, i) {
         if (i >= state.base.unlocked) return;
         var plot = state.base.plots[i];
         if (!plot) return;
+        if (!seen(s.x, s.y)) return;
         out.push({
           dep: s.dep + 1.4, x: s.x, s: s, plot: plot,
           draw: function (g, P, it) { this.drawBuilding(g, it.plot.type, it.plot.level, it.s, P); }
@@ -685,6 +946,7 @@ window.HC = window.HC || {};
 
       DECOR.forEach(function (d) {
         var c = iso(d.gx + 0.5, d.gy + 0.5);
+        if (!seen(c.x, c.y)) return;
         out.push({
           dep: d.gx + d.gy + 1, x: c.x, y: c.y, d: d,
           draw: function (g, P, it) {
@@ -1066,8 +1328,11 @@ window.HC = window.HC || {};
       // не ходят строем.
       var flip = ((s.i || 0) % 2) ? -1 : 1;
       var tt = this.t + (s.i || 0) * 0.83;
+      // подскок после стройки: постройка «садится» на место
+      var pp = this.pops[s.i] || 0;
+      if (pp > 0) grow *= 1 + Math.sin(Math.PI * (1 - pp)) * 0.13;
 
-      // тень на земле
+      // тень ромбом по плитке
       g.save();
       g.globalAlpha = 0.5 * fade;
       g.fillStyle = P.shadow || 'rgba(0,0,0,.2)';
@@ -1079,20 +1344,23 @@ window.HC = window.HC || {};
       g.restore();
       g.globalAlpha = 1;
 
-      // боковая грань: тот же силуэт, сдвинутый и залитый одним тоном.
-      // Отсюда и берётся объём — постройка перестаёт быть наклейкой.
-      var tone = P.sideFace || P.groundDeep || P.ground;
-      g.save();
-      g.globalAlpha = 0.95 * fade;
-      g.translate(s.x + 11 * sc, s.y - 6 * sc);
-      g.scale(flip * sc * grow, sc * grow);
-      g.strokeStyle = tone;
-      g.fillStyle = tone;
-      g.lineWidth = 2.4;
-      g.lineJoin = 'round';
-      fn.call(this, g, this.flatTone(tone), level, tt);
-      g.restore();
-      g.globalAlpha = 1;
+      // Боковая грань: тот же силуэт, сдвинутый и залитый одним тоном —
+      // отсюда объём. На сильном отъезде её всё равно не разглядеть, а
+      // стоит она полной отрисовки, поэтому там пропускаем.
+      if (this.zoom >= 0.5) {
+        var tone = P.sideFace || P.groundDeep || P.ground;
+        g.save();
+        g.globalAlpha = 0.95 * fade;
+        g.translate(s.x + 11 * sc, s.y - 6 * sc);
+        g.scale(flip * sc * grow, sc * grow);
+        g.strokeStyle = tone;
+        g.fillStyle = tone;
+        g.lineWidth = 2.4;
+        g.lineJoin = 'round';
+        fn.call(this, g, this.flatTone(tone), level, tt);
+        g.restore();
+        g.globalAlpha = 1;
+      }
 
       // сама постройка
       g.save();
@@ -1100,11 +1368,7 @@ window.HC = window.HC || {};
       g.translate(s.x, s.y);
       g.scale(flip * sc * grow, sc * grow);
       g.strokeStyle = P.ink;
-      var bg = g.createLinearGradient(0, -90, 0, 10);
-      bg.addColorStop(0, P.bodyHi || P.bodyFill);
-      bg.addColorStop(0.55, P.bodyFill);
-      bg.addColorStop(1, P.bodyShade || P.bodyFill);
-      g.fillStyle = bg;
+      g.fillStyle = this.bodyFill(g, P);
       g.lineWidth = 2.4;
       g.lineJoin = 'round';
       fn.call(this, g, P, level, tt);
@@ -1112,6 +1376,19 @@ window.HC = window.HC || {};
       g.globalAlpha = 1;
 
       this.drawBadge(g, s.x, s.y + 13 * sc, level, P, sc);
+    },
+
+    /* Заливка корпуса: градиент один на тему, а не новый на каждую постройку */
+    bodyFill: function (g, P) {
+      if (!this._fill || this._fillKey !== P.ink) {
+        var bg = g.createLinearGradient(0, -90, 0, 10);
+        bg.addColorStop(0, P.bodyHi || P.bodyFill);
+        bg.addColorStop(0.55, P.bodyFill);
+        bg.addColorStop(1, P.bodyShade || P.bodyFill);
+        this._fill = bg;
+        this._fillKey = P.ink;
+      }
+      return this._fill;
     },
 
     drawBadge: function (g, x, y, level, P, sc) {
