@@ -58,6 +58,7 @@ window.HC = window.HC || {};
         sfxVol: 0.5,
         theme: 'paper',
         calmMode: false,
+        shake: true,
         showHints: true
       }
     };
@@ -92,10 +93,11 @@ window.HC = window.HC || {};
     s.up = s.up || {};
     delete s.tune;
     for (var v in HC.VEHICLES) {
-      s.up[v] = s.up[v] || defaultUpgrades();
-      for (var u in HC.UPGRADES) {
-        s.up[v][u] = Math.max(0, Math.min(HC.UPGRADES[u].max, num(s.up[v][u], 0)));
+      var keep = defaultUpgrades();
+      for (var u in keep) {
+        keep[u] = Math.max(0, Math.min(HC.UPGRADES[u].max, num((s.up[v] || {})[u], 0)));
       }
+      s.up[v] = keep;      // отменённые линии прокачки из старого сейва отпадают
     }
 
     // задания: списки пересобираются сами при смене дня/недели/месяца

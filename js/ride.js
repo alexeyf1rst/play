@@ -79,8 +79,11 @@ window.HC = window.HC || {};
       // приземление: тряска, пыль из-под колёс и глухой удар
       if (wasAir && car.onGround && fallV > 240) {
         var force = Math.min(1, (fallV - 240) / 900);
-        // на заставке трясти незачем — там просто спокойно едет машина
-        if (!this.demo) this.shake = Math.max(this.shake, 0.35 + force * 0.65);
+        // на заставке трясти незачем — там просто спокойно едет машина,
+        // и тряску можно выключить в настройках
+        if (!this.demo && this.game.state.settings.shake !== false) {
+          this.shake = Math.max(this.shake, 0.35 + force * 0.65);
+        }
         HC.Audio.land(force);
         if (!this.game.state.settings.calmMode) {
           // хлопок по земле: расходящееся кольцо в точке касания
@@ -111,8 +114,11 @@ window.HC = window.HC || {};
 
       // сальто и полёт
       if (!car.onGround) {
-        if (Math.abs(car.spinAccum) > Math.PI * 2) {
-          car.spinAccum -= Math.sign(car.spinAccum) * Math.PI * 2;
+        // Сальто засчитывается чуть раньше полного оборота: на глаз движение
+        // уже сделано, а последние градусы машина добирает уже на земле.
+        var turn = Math.PI * 2 * (HC.ECON.flipPart || 1);
+        if (Math.abs(car.spinAccum) > turn) {
+          car.spinAccum -= Math.sign(car.spinAccum) * turn;
           this.flips++;
           this.airFlips++;
           // каждое следующее сальто в одном прыжке дороже предыдущего
@@ -156,6 +162,7 @@ window.HC = window.HC || {};
       }
 
       if (T.soft) this.sink(dt);
+      if (T.hasLogs) this.fallen(dt);
       this.hitTrees();
       this.collect();
       this.dust(dt);
@@ -301,7 +308,40 @@ window.HC = window.HC || {};
 
     addCoins: function (n, x, y, label) {
       this.coins += n;
-      this.floats.push({ x: x, y: y, t: 0, text: (label ? label + ' +' : '+') + n });
+      var shown = n % 1 ? HC.fmt1(n) : n;
+      this.floats.push({ x: x, y: y, t: 0, text: (label ? label + ' +' : '+') + shown });
+    },
+
+    /* Ход падения деревьев: когда ствол стукается об землю — пыль,
+       глухой удар и лёгкая тряска, если она включена. */
+    fallen: function (dt) {
+      var landed = this.terrain.fallLogs(dt);
+      if (!landed) return;
+      var calm = this.game.state.settings.calmMode;
+      for (var i = 0; i < landed.length; i++) {
+        var L = landed[i];
+        if (Math.abs(L.x - this.car.pos.x) > 1400) continue;   // не видно — не слышно
+        HC.Audio.land(0.45);
+        if (!this.demo && this.game.state.settings.shake !== false) {
+          this.shake = Math.max(this.shake, 0.3);
+        }
+        if (calm) continue;
+        var y = this.terrain.height(L.x) + this.terrain.logAt(L.x);
+        this.particles.push({
+          ring: true, x: L.x, y: y, vx: 0, vy: 0,
+          r: 10, t: 0, life: 0.5, force: 0.5
+        });
+        for (var j = 0; j < 14; j++) {
+          this.particles.push({
+            x: L.x + (Math.random() - 0.5) * L.w * 1.2,
+            y: y - Math.random() * 12,
+            vx: (Math.random() - 0.5) * 150,
+            vy: -40 - Math.random() * 120,
+            r: 4 + Math.random() * 8, t: 0, life: 0.6 + Math.random() * 0.6,
+            big: true
+          });
+        }
+      }
     },
 
     /* Жидкий песок: колесо продавливает воронку. Стоишь и буксуешь —
@@ -321,7 +361,7 @@ window.HC = window.HC || {};
         var move = Math.abs(car.vel.x);
         // большое колесо меньше режет песок — трак почти не тонет
         var wide = 22 / Math.max(14, w.r);
-        var rate = soft * wide * (8 + slip * 0.05) * clamp(1 - move / 260, 0.10, 1);
+        var rate = soft * wide * (9 + slip * 0.055) * clamp(1 - move / 260, 0.10, 1);
         T.dig(w.pos.x, rate * dt);
         if (!calm && slip > 50 && Math.random() < dt * 16) {
           this.particles.push({
@@ -351,8 +391,9 @@ window.HC = window.HC || {};
         var top = T.height(tr.x) - 74 * tr.s;
         if (car.pos.y < top) continue;                  // перелетел поверху
         if (!T.breakTree(tr.id)) continue;
-        // ствол ложится вперёд по ходу и становится бугром в рельефе
-        T.dropLog(tr.x + (car.vel.x >= 0 ? 1 : -1) * 170, tr.s);
+        // дерево заваливается вперёд по ходу и по мере укладки становится
+        // бугром в рельефе — дальше через него придётся переползать
+        T.dropLog(tr, car.vel.x >= 0 ? 1 : -1);
         car.vel.x *= 0.72;
         car.angVel += 0.8 * Math.sign(car.vel.x || 1);
         HC.Audio.crack();
@@ -370,22 +411,18 @@ window.HC = window.HC || {};
     collect: function () {
       var car = this.car;
       var reach = 44 + car.def.wheel.r * 0.5;
-      var pull = car.magnet;
       var items = this.terrain.itemsIn(car.pos.x - 400, car.pos.x + 500);
       for (var i = 0; i < items.length; i++) {
         var it = items[i];
         var dx = car.pos.x - it.x, dy = car.pos.y - it.y;
         var d = Math.sqrt(dx * dx + dy * dy);
-        if (pull > 0 && d < pull && d > 1) {
-          var s = Math.min(1, (pull - d) / pull) * 9;
-          it.x += dx / d * s; it.y += dy / d * s;
-        }
         if (d < reach) {
           this.terrain.take(it);
           if (it.type === 'coin') {
             // чем дальше уехал, тем дороже монетка — но не до бесконечности
             var steps = Math.min(Math.floor(car.distance / 100), HC.ECON.coinPer100Max);
-            var val = HC.ECON.coinPickup + HC.ECON.coinPer100 * steps;
+            // округляем до десятых: иначе в подписи вылезает 1.6000000000000001
+            var val = Math.round((HC.ECON.coinPickup + HC.ECON.coinPer100 * steps) * 10) / 10;
             this.addCoins(val, it.x, it.y);
             HC.Audio.coin();
           } else if (it.type === 'ore') {
@@ -569,33 +606,21 @@ window.HC = window.HC || {};
       // хайвэй: отбойник по обочине, позади машины
       T.drawRail(g, x0, x1, P);
 
-      // деревья-препятствия: от сбитого остаётся пенёк
+      // деревья-препятствия: сбитые рисует сам ландшафт — они падают
       var trees = T.treesIn(x0, x1);
       for (var ti = 0; ti < trees.length; ti++) {
         var tr = trees[ti];
-        var ty = T.height(tr.x);
+        if (tr.broken) continue;
         g.save();
-        g.translate(tr.x, ty);
-        if (tr.broken) {
-          g.globalAlpha = 0.8;
-          g.strokeStyle = P.ink;
-          g.fillStyle = P.bodyShade || P.bodyFill;
-          g.lineWidth = 2.4;
-          g.beginPath();
-          g.moveTo(-7 * tr.s, 2); g.lineTo(-6 * tr.s, -13 * tr.s);
-          g.lineTo(6 * tr.s, -11 * tr.s); g.lineTo(7 * tr.s, 2);
-          g.closePath(); g.fill(); g.stroke();
-        } else {
-          HC.Decor.shadow(g, P, 20 * tr.s, 0.24);
-          HC.Decor.draw(g, tr.kind, P, tr.s, false);
-        }
+        g.translate(tr.x, T.height(tr.x));
+        HC.Decor.shadow(g, P, 20 * tr.s, 0.24);
+        HC.Decor.draw(g, tr.kind, P, tr.s, false);
         g.restore();
-        g.globalAlpha = 1;
       }
 
-      // сами брёвна: через них и приходится переползать
+      // падающие и уже лежащие стволы
       if (T.hasLogs) {
-        var logs = T.logsIn(x0, x1);
+        var logs = T.logsIn(x0 - 400, x1 + 400);
         for (var li = 0; li < logs.length; li++) T.drawLog(g, logs[li], P);
       }
 

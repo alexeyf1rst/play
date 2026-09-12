@@ -91,7 +91,7 @@ window.HC = window.HC || {};
       return { coins: coins * m, ore: ore * m };
     },
     capacity: function (state) {
-      var c = 4000, o = 40, d = HC.BUILDINGS.storage;
+      var c = 400, o = 40, d = HC.BUILDINGS.storage;
       this.each(state, 'storage', function (p) {
         c += d.capCoins * Math.pow(d.capMult, p.level - 1);
         o += d.capOre * Math.pow(d.capMult, p.level - 1);

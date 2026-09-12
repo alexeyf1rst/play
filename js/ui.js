@@ -17,7 +17,7 @@ window.HC = window.HC || {};
   }
   HC.icon = ic;
 
-  var UP_ICON = { engine: 'engine', tires: 'tires', susp: 'susp', fuel: 'fuel', magnet: 'magnet' };
+  var UP_ICON = { engine: 'engine', tires: 'tires', susp: 'susp', fuel: 'fuel' };
   var QUEST_ICON = {
     dist_run: 'flag', coins_run: 'coin', dist_total: 'road', coins_earn: 'coin',
     flips: 'flip', air: 'cloud', ore: 'ore', runs: 'repeat', cans: 'fuel',
@@ -645,7 +645,8 @@ window.HC = window.HC || {};
 
           '<h4 class="sec">' + ic('settings') + 'Вид</h4>' +
           '<label class="row switch"><span>Тёмная тема</span><input type="checkbox" id="set-theme" ' + (set.theme === 'dark' ? 'checked' : '') + '></label>' +
-          '<label class="row switch"><span>Спокойный режим <em>(без пыли и тряски)</em></span><input type="checkbox" id="set-calm" ' + (set.calmMode ? 'checked' : '') + '></label>' +
+          '<label class="row switch"><span>Спокойный режим <em>(без пыли и частиц)</em></span><input type="checkbox" id="set-calm" ' + (set.calmMode ? 'checked' : '') + '></label>' +
+          '<label class="row switch"><span>Тряска камеры <em>(на приземлении)</em></span><input type="checkbox" id="set-shake" ' + (set.shake !== false ? 'checked' : '') + '></label>' +
 
           '<h4 class="sec">' + ic('mine') + 'Добыча</h4>' +
           '<div class="stat"><span>' + ic('coin', 'sm') + 'монет в минуту</span><b>' + HC.fmt1(r.coins) + '</b></div>' +
@@ -716,6 +717,9 @@ window.HC = window.HC || {};
             });
             root.querySelector('#set-calm').addEventListener('change', function (e) {
               G.state.settings.calmMode = e.target.checked; HC.save(G.state, true);
+            });
+            root.querySelector('#set-shake').addEventListener('change', function (e) {
+              G.state.settings.shake = e.target.checked; HC.save(G.state, true);
             });
 
             function afterCheat(msg) {

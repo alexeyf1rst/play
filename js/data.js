@@ -43,7 +43,7 @@ window.HC = window.HC || {};
     scooter: {
       name: 'Скутер', order: 1,
       about: 'Маленькие колёса и лёгкая рама. Вертлявый и экономный, но каждая кочка — его враг.',
-      price: 26000, priceOre: 0,
+      price: 260000, priceOre: 0,
       mass: 4.6, power: 9000, fuel: 62, burn: 1.7, topSpeed: 410, react: 0.40, airCtrl: 1.85,
       drive: 'rear',
       wheel: { r: 14, mass: 0.8, grip: 0.90 },
@@ -55,7 +55,7 @@ window.HC = window.HC || {};
     bolid: {
       name: 'Болид', order: 2,
       about: 'Длинный, низкий, очень быстрый. На ровном никто не догонит, на кочках цепляет днищем.',
-      price: 150000, priceOre: 90,
+      price: 1500000, priceOre: 90,
       mass: 7.5, power: 21000, fuel: 125, burn: 3.1, topSpeed: 750, react: 0.80, airCtrl: 1.25,
       drive: 'rear',
       wheel: { r: 16, mass: 1.1, grip: 1.28 },
@@ -67,7 +67,7 @@ window.HC = window.HC || {};
     truck: {
       name: 'Трак', order: 3,
       about: 'Огромные колёса переезжают то, обо что спотыкаются остальные. Тяжёлый и стойкий.',
-      price: 480000, priceOre: 340,
+      price: 4800000, priceOre: 340,
       mass: 18, power: 27000, fuel: 190, burn: 3.8, topSpeed: 490, react: 0.90, airCtrl: 0.85,
       drive: 'all',
       wheel: { r: 36, mass: 3.1, grip: 1.32 },
@@ -79,7 +79,7 @@ window.HC = window.HC || {};
     rover: {
       name: 'Луноход', order: 4,
       about: 'Немного парит: в воздухе тянет вниз слабее, чем остальных. Липкое сцепление, долгие прыжки.',
-      price: 1100000, priceOre: 1000,
+      price: 11000000, priceOre: 1000,
       mass: 11, power: 17000, fuel: 210, burn: 2.7, topSpeed: 450, react: 1.00, airCtrl: 1.15,
       drive: 'all', lift: 0.38,
       wheel: { r: 30, mass: 2.0, grip: 1.45 },
@@ -100,50 +100,50 @@ window.HC = window.HC || {};
     hills: {
       name: 'Холмы', order: 0, unlock: null,
       about: 'Мягкие волны и трамплины. Место, где учатся.',
-      amp: 150, len: 620, rough: 0.45, gravity: 1350,
+      amp: 200, len: 620, rough: 0.64, gravity: 1350,
       grip: 1.00, roll: 1.00,
       coinRate: 1.00, oreRate: 0.10, payout: 1.00,
       far: ['pine', 'tree'],
-      goals: [ 400, 900, 1800 ]
+      goals: [ 300, 700, 1200 ]
     },
     sand: {
       name: 'Песочница', order: 1, unlock: 'hills',
       about: 'Дюны с крутым сыпучим склоном. В рыхлых пятнах колёса проваливаются: стоять нельзя.',
-      amp: 130, len: 900, rough: 0.35, gravity: 1330,
+      amp: 165, len: 900, rough: 0.46, gravity: 1330,
       grip: 0.62, roll: 2.6,
       coinRate: 1.10, oreRate: 0.14, payout: 1.35,
       far: ['cactus', 'rock'],
       dunes: 1, soft: 1,
-      goals: [ 300, 700, 1400 ]
+      goals: [ 250, 600, 1100 ]
     },
     highway: {
       name: 'Хайвэй', order: 2, unlock: 'sand',
       about: 'Асфальт, разметка и отбойник. Ровно, быстро — и падать тут не на песок.',
-      amp: 95, len: 1600, rough: 0.12, gravity: 1330,
+      amp: 155, len: 1600, rough: 0.40, gravity: 1330,
       grip: 1.20, roll: 0.60,
       coinRate: 1.00, oreRate: 0.08, payout: 1.60,
       far: ['pole', 'lamp', 'tower'],
-      road: 1, rail: 1,
+      road: 1, rail: 1, featAmp: 2.2,
       feats: { ramp: 0.44, table: 0.38, bumps: 0.18 },
-      goals: [ 650, 1500, 3000 ]
+      goals: [ 400, 900, 1600 ]
     },
     moon: {
       name: 'Луна', order: 3, unlock: 'highway',
       about: 'Гравитация вполсилы. Прыжки длинные, времени на сальто вагон.',
-      amp: 160, len: 900, rough: 0.40, gravity: 520,
-      grip: 0.90, roll: 0.90,
+      amp: 235, len: 900, rough: 0.70, gravity: 520,
+      grip: 0.90, roll: 0.90, featAmp: 0.8,
       coinRate: 1.05, oreRate: 0.40, payout: 2.10,
       far: ['rock'],
-      goals: [ 500, 1100, 2200 ]
+      goals: [ 400, 850, 1500 ]
     },
     forest: {
       name: 'Лес', order: 4, unlock: 'moon',
       about: 'Деревья стоят прямо на дороге. Сбить можно — только ствол потом лежит поперёк, и через него надо переползать.',
-      amp: 160, len: 700, rough: 0.50, gravity: 1350,
+      amp: 200, len: 700, rough: 0.66, gravity: 1350,
       grip: 1.05, roll: 1.10,
       coinRate: 1.15, oreRate: 0.30, payout: 2.60,
       far: ['pine', 'tree'],
-      goals: [ 400, 900, 1600 ],
+      goals: [ 250, 650, 1200 ],
       trees: true
     }
   };
@@ -182,25 +182,26 @@ window.HC = window.HC || {};
      effect  — прибавка за уровень
   */
   HC.UPGRADES = {
-    engine:  { name: 'Двигатель',  max: 15, base: 1450, mult: 1.46, ore: 0,    oreFrom: 8,  oreBase: 9,
-               about: 'Тяга. Больше тяги — легче в гору, но легче и на спину.' },
-    tires:   { name: 'Шины',       max: 15, base: 1250, mult: 1.44, ore: 0,    oreFrom: 8,  oreBase: 8,
-               about: 'Сцепление с землёй. Меньше пробуксовки.' },
-    susp:    { name: 'Подвеска',   max: 15, base: 1600, mult: 1.45, ore: 0,    oreFrom: 8,  oreBase: 9,
-               about: 'Мягче приземления, реже кувырки.' },
-    fuel:    { name: 'Бак',        max: 15, base: 1350, mult: 1.42, ore: 0,    oreFrom: 9,  oreBase: 8,
-               about: 'Дольше едешь — дальше уезжаешь.' },
-    magnet:  { name: 'Магнит',     max: 10, base: 3900, mult: 1.58, ore: 0,    oreFrom: 4,  oreBase: 12,
-               about: 'Притягивает монеты. Меньше нужно целиться.' }
+    engine:  { name: 'Двигатель',  max: 15, base: 14500, mult: 1.46, ore: 0,    oreFrom: 8,  oreBase: 9,
+               about: 'Тяга и предел скорости. На максимуме машина вдвое сильнее и вдвое быстрее.' },
+    tires:   { name: 'Шины',       max: 15, base: 12500, mult: 1.44, ore: 0,    oreFrom: 8,  oreBase: 8,
+               about: 'Сцепление с землёй. На максимуме держит вдвое лучше.' },
+    susp:    { name: 'Подвеска',   max: 15, base: 16000, mult: 1.45, ore: 0,    oreFrom: 8,  oreBase: 9,
+               about: 'Мягче приземления, реже кувырки. На максимуме вдвое спокойнее.' },
+    fuel:    { name: 'Бак',        max: 15, base: 13500, mult: 1.42, ore: 0,    oreFrom: 9,  oreBase: 8,
+               about: 'Дольше едешь — дальше уезжаешь. На максимуме бак вдвое больше.' }
   };
 
-  // Во что превращается уровень прокачки
+  /* Во что превращается уровень прокачки.
+     Правило простое: на максимуме ровно вдвое больше, чем на нуле. */
+  function twice(key) {
+    return function (l) { return 1 + l / HC.UPGRADES[key].max; };
+  }
   HC.upgradeEffect = {
-    engine: function (l) { return 1 + l * 0.055; },   // множитель тяги
-    tires:  function (l) { return 1 + l * 0.055; },   // множитель сцепления
-    susp:   function (l) { return 1 + l * 0.060; },   // жёсткость/демпфер
-    fuel:   function (l) { return 1 + l * 0.110; },   // множитель бака
-    magnet: function (l) { return l === 0 ? 0 : 40 + l * 26; } // радиус притяжения, px
+    engine: twice('engine'),   // тяга и предел скорости
+    tires:  twice('tires'),    // сцепление
+    susp:   twice('susp'),     // мягкость подвески
+    fuel:   twice('fuel')      // объём бака
   };
 
   /* --- База: постройки -----------------------------------
@@ -211,81 +212,81 @@ window.HC = window.HC || {};
   HC.BUILDINGS = {
     mine: {
       name: 'Шахта', icon: 'mine', max: 12,
-      cost: 1650, costMult: 1.68, ore: 0, oreMult: 1.5, oreFrom: 6, oreBase: 12,
+      cost: 16500, costMult: 1.68, ore: 0, oreMult: 1.5, oreFrom: 6, oreBase: 12,
       about: 'Тихо стучит внутри холма и приносит монеты.',
-      rate: 54, rateMult: 1.40, res: 'coins',
-      build: 45, buildMult: 1.62
+      rate: 5.4, rateMult: 1.40, res: 'coins',
+      build: 450, buildMult: 1.62
     },
     drill: {
       name: 'Бур', icon: 'drill', max: 12,
-      cost: 12000, costMult: 1.72, ore: 14, oreMult: 1.52, oreFrom: 1, oreBase: 14,
+      cost: 120000, costMult: 1.72, ore: 14, oreMult: 1.52, oreFrom: 1, oreBase: 14,
       about: 'Достаёт руду с глубины. Руда нужна для серьёзных вещей.',
       rate: 0.52, rateMult: 1.36, res: 'ore',
-      build: 150, buildMult: 1.60
+      build: 1500, buildMult: 1.60
     },
     storage: {
       name: 'Склад', icon: 'storage', max: 12,
-      cost: 2700, costMult: 1.64, ore: 0, oreMult: 1.5, oreFrom: 7, oreBase: 9,
+      cost: 27000, costMult: 1.64, ore: 0, oreMult: 1.5, oreFrom: 7, oreBase: 9,
       about: 'Сколько добра накопится, пока тебя нет.',
-      capCoins: 3400, capOre: 38, capMult: 1.52,
-      build: 70, buildMult: 1.58
+      capCoins: 340, capOre: 38, capMult: 1.52,
+      build: 700, buildMult: 1.58
     },
     windmill: {
       name: 'Ветряк', icon: 'windmill', max: 10,
-      cost: 8100, costMult: 1.76, ore: 6, oreMult: 1.55, oreFrom: 3, oreBase: 9,
+      cost: 81000, costMult: 1.76, ore: 6, oreMult: 1.55, oreFrom: 3, oreBase: 9,
       about: 'Крутится медленно. Ускоряет всё вокруг.',
       bonus: 0.08,   // +8% ко всей добыче за уровень
-      build: 200, buildMult: 1.60
+      build: 2000, buildMult: 1.60
     },
     workshop: {
       name: 'Мастерская', icon: 'workshop', max: 10,
-      cost: 10200, costMult: 1.78, ore: 9, oreMult: 1.55, oreFrom: 2, oreBase: 12,
+      cost: 102000, costMult: 1.78, ore: 9, oreMult: 1.55, oreFrom: 2, oreBase: 12,
       about: 'Скидка на прокачку машины и больше монет с заездов.',
       discount: 0.025, // −2.5% к цене прокачки за уровень
       ridebonus: 0.05, // +5% монет с заезда за уровень
-      build: 240, buildMult: 1.62
+      build: 2400, buildMult: 1.62
     },
     garden: {
       name: 'Сад', icon: 'garden', max: 8,
-      cost: 6000, costMult: 1.70, ore: 0, oreMult: 1.5, oreFrom: 5, oreBase: 8,
+      cost: 60000, costMult: 1.70, ore: 0, oreMult: 1.5, oreFrom: 5, oreBase: 8,
       about: 'Ничего не производит. Просто держит время дольше.',
       offline: 1.2,   // +1.2 часа к копилке офлайна за уровень
-      build: 110, buildMult: 1.58
+      build: 1100, buildMult: 1.58
     },
     smelter: {
       name: 'Плавильня', icon: 'smelter', max: 10,
-      cost: 5400, costMult: 1.68, ore: 9, oreMult: 1.5, oreFrom: 2, oreBase: 12,
+      cost: 54000, costMult: 1.68, ore: 9, oreMult: 1.5, oreFrom: 2, oreBase: 12,
       about: 'Переплавляет свежую руду в монеты. Без буров стоит холодная.',
-      melt: 300, meltMult: 1.40, eats: 0.5,   // монет/мин и руды/мин за уровень
-      build: 160, buildMult: 1.60
+      melt: 30, meltMult: 1.40, eats: 0.5,   // монет/мин и руды/мин за уровень
+      build: 1600, buildMult: 1.60
     },
     garage: {
       name: 'Гараж', icon: 'carport', max: 10,
-      cost: 7800, costMult: 1.56, ore: 6, oreMult: 1.5, oreFrom: 3, oreBase: 9,
+      cost: 78000, costMult: 1.56, ore: 6, oreMult: 1.5, oreFrom: 3, oreBase: 9,
       about: 'Машина ночует под крышей: бак больше, расход меньше.',
       fuel: 0.05, burn: 0.02,   // +5% к баку и −2% расхода за уровень
-      build: 180, buildMult: 1.56
+      build: 1800, buildMult: 1.56
     },
     radio: {
       name: 'Радиовышка', icon: 'radio', max: 8,
-      cost: 10500, costMult: 1.60, ore: 8, oreMult: 1.5, oreFrom: 2, oreBase: 11,
+      cost: 105000, costMult: 1.60, ore: 8, oreMult: 1.5, oreFrom: 2, oreBase: 11,
       about: 'Ловит заказы издалека — за задания платят больше.',
       questBonus: 0.08,   // +8% к наградам заданий за уровень
-      build: 260, buildMult: 1.58
+      build: 2600, buildMult: 1.58
     },
     depot: {
       name: 'Депо', icon: 'depot', max: 8,
-      cost: 9000, costMult: 1.56, ore: 9, oreMult: 1.5, oreFrom: 2, oreBase: 12,
+      cost: 90000, costMult: 1.56, ore: 9, oreMult: 1.5, oreFrom: 2, oreBase: 12,
       about: 'Свозит добычу на склад само, пока игра открыта.',
       auto: 16,   // автосбор раз в 16/уровень минут
-      build: 220, buildMult: 1.56
+      build: 2200, buildMult: 1.56
     }
   };
 
   /* --- Участки под постройки ------------------------------ */
   HC.PLOTS = {
     free: 4,          // открыто с самого начала
-    cost: 5000,       // цена следующего участка
+    cost: 50000,      // цена следующего участка
     mult: 1.60,
     // Площадки на изометрической сетке: gx/gy — левый верхний угол участка
     // (участок занимает 2×2 плитки). Первые открытые стоят у въезда, дальше
@@ -302,17 +303,19 @@ window.HC = window.HC || {};
 
   /* --- Прочая экономика ----------------------------------- */
   HC.ECON = {
-    coinPickup: 7,        // монет за монетку у старта
-    coinPer100: 2,        // и ещё столько же за каждые пройденные 100 м
-    coinPer100Max: 25,    // но не бесконечно: дальше монетка не дорожает
+    coinPickup: 1,         // монет за монетку у старта
+    coinPer100: 0.2,       // и ещё столько же за каждые пройденные 100 м
+    coinPer100Max: 25,     // но не бесконечно: дальше монетка не дорожает
     orePickup: 1,          // руды за один камень
     fuelPickup: 0.16,      // доля бака за канистру
-    distancePer100: 3,     // монет за каждые 100 м
+    coinEvery: 100,        // монетки лежат примерно через столько метров
+    distancePer100: 0.3,   // монет за каждые 100 м
     recordBonus: 0.35,     // доля сверху за новый рекорд
-    flipCoins: 70,         // за первое сальто в прыжке; второе дороже вдвое и т.д.
-    airBonus: 30,          // за каждую секунду в воздухе, если прыжок был долгий
+    flipCoins: 7,          // за первое сальто в прыжке; второе дороже вдвое и т.д.
+    flipPart: 0.8,         // сальто засчитывается, когда докрутил столько оборота
+    airBonus: 3,           // за каждую секунду в воздухе, если прыжок был долгий
     airMin: 1.1,           // с какого времени полёта идёт награда
-    kmBonus: 60,           // за каждый километр: 60, 120, 180... — за риск
+    kmBonus: 6,            // за каждый километр: 6, 12, 18... — за риск
     offlineHoursBase: 3,   // базовый потолок офлайн-копилки
     startCoins: 0
   };

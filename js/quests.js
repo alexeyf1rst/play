@@ -14,9 +14,9 @@ window.HC = window.HC || {};
             (для «за один заезд» растёт медленно, иначе невыполнимо). */
   HC.QUEST_KINDS = {
     dist_run:   { text: 'Проехать {n} м за один заезд',        mode: 'max', min: 500,  max: 1100, step: 50,  grow: 2.0 },
-    coins_run:  { text: 'Собрать {n} монет на трассе за заезд', mode: 'max', min: 50,   max: 110,  step: 10,  grow: 1.9 },
+    coins_run:  { text: 'Собрать {n} монет на трассе за заезд', mode: 'max', min: 20,   max: 45,   step: 5,   grow: 1.9 },
     dist_total: { text: 'Проехать {n} м всего',                 mode: 'sum', min: 2000, max: 4000, step: 250 },
-    coins_earn: { text: 'Заработать {n} монет',                 mode: 'sum', min: 800,  max: 1800, step: 100 },
+    coins_earn: { text: 'Заработать {n} монет',                 mode: 'sum', min: 120,  max: 260,  step: 20 },
     flips:      { text: 'Сделать {n} сальто',                   mode: 'sum', min: 2,    max: 5,    step: 1 },
     air:        { text: 'Пробыть в воздухе {n} с',              mode: 'sum', min: 20,   max: 45,   step: 5 },
     ore:        { text: 'Добыть {n} руды',                      mode: 'sum', min: 3,    max: 8,    step: 1 },
@@ -28,9 +28,9 @@ window.HC = window.HC || {};
   };
 
   HC.QUEST_PERIODS = {
-    daily:   { name: 'На день',   tab: 'День',   count: 3, factor: 1,   idx: 0, coins: [1600, 3100],   ore: [0, 0] },
-    weekly:  { name: 'На неделю', tab: 'Неделя', count: 3, factor: 4.5, idx: 1, coins: [10000, 19000], ore: [10, 22] },
-    monthly: { name: 'На месяц',  tab: 'Месяц',  count: 2, factor: 16,  idx: 2, coins: [55000, 95000], ore: [60, 120] }
+    daily:   { name: 'На день',   tab: 'День',   count: 3, factor: 1,   idx: 0, coins: [160, 310],     ore: [0, 0] },
+    weekly:  { name: 'На неделю', tab: 'Неделя', count: 3, factor: 4.5, idx: 1, coins: [1000, 1900],   ore: [10, 22] },
+    monthly: { name: 'На месяц',  tab: 'Месяц',  count: 2, factor: 16,  idx: 2, coins: [5500, 9500],   ore: [60, 120] }
   };
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -126,7 +126,7 @@ window.HC = window.HC || {};
         : roundTo(base * P.factor, kind.step);
       var q = { t: kinds[k], n: target, p: 0, c: false };
       if (kind.track) q.track = openTracks[Math.floor(r() * openTracks.length)] || 'hills';
-      q.rc = Math.round((P.coins[0] + r() * (P.coins[1] - P.coins[0])) / 10) * 10;
+      q.rc = Math.round((P.coins[0] + r() * (P.coins[1] - P.coins[0])) / 5) * 5;
       q.ro = Math.round(P.ore[0] + r() * (P.ore[1] - P.ore[0]));
       list.push(q);
     }

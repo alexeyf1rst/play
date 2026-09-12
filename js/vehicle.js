@@ -22,16 +22,24 @@ window.HC = window.HC || {};
     this.terrain = terrain;
     this.gravity = gravity;
 
-    var lu = { engine: up.engine | 0, tires: up.tires | 0, susp: up.susp | 0, fuel: up.fuel | 0, magnet: up.magnet | 0 };
-    this.power = def.power * E.engine(lu.engine);
-    this.topSpeed = def.topSpeed * (1 + lu.engine * 0.018);
+    var lu = { engine: up.engine | 0, tires: up.tires | 0, susp: up.susp | 0, fuel: up.fuel | 0 };
+    // Прокачка устроена так, что на максимуме всё ровно вдвое больше:
+    // и тяга, и предел скорости, и сцепление, и бак.
+    var eng = E.engine(lu.engine);
+    this.power = def.power * eng;
+    this.topSpeed = def.topSpeed * eng;
     // покрытие трассы: песок вязкий и скользкий, асфальт наоборот
     var surf = (terrain && terrain.track) || {};
     this.surfGrip = surf.grip || 1;
     this.surfRoll = surf.roll || 1;
     this.lift = def.lift || 0;          // луноход слегка парит
 
-    this.grip = def.wheel.grip * E.tires(lu.tires) * this.surfGrip;
+    var tyre = E.tires(lu.tires);
+    this.grip = def.wheel.grip * tyre * this.surfGrip;
+    // Отдача двигателя на кузов растёт от тяги, но не от шин: цепкие шины
+    // должны везти, а не задирать нос. Иначе прокачанная машина встаёт
+    // на спину на ровном месте, особенно там, где гравитация слабая.
+    this.reactK = (def.react || 1) / Math.sqrt(tyre);
     this.rollFree = 0.5 * this.surfRoll;
     // отзывчивость в воздухе: общая настройка × характер машины
     var airBase = def.airCtrl || 1;
@@ -41,7 +49,6 @@ window.HC = window.HC || {};
     var st0 = (HC.Game && HC.Game.state && HC.Economy) ? HC.Game.state : null;
     this.maxFuel = def.fuel * E.fuel(lu.fuel) * (st0 ? HC.Economy.garageFuel(st0) : 1);
     this.burnK = st0 ? HC.Economy.garageBurn(st0) : 1;
-    this.magnet = E.magnet(lu.magnet);
 
     // масса и момент инерции кузова
     var bb = { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 };
@@ -55,12 +62,16 @@ window.HC = window.HC || {};
 
     // подвеска: считаем жёсткость из массы и желаемой просадки
     var total = def.mass + def.wheel.mass * def.axles.length;
+    var sp = E.susp(lu.susp);           // 1 на нуле, 2 на максимуме
     this.suspRest = def.susp.rest;
     this.suspMin = def.susp.min;
-    this.suspMax = def.susp.max * (1 + lu.susp * 0.03);
-    this.suspK = (total * REF_G / def.axles.length) / def.susp.sag * (1 + lu.susp * 0.02);
-    this.suspC = 2 * Math.sqrt(this.suspK * (total / def.axles.length)) * def.susp.damp *
-                 (1 + lu.susp * 0.05);
+    this.suspMax = def.susp.max * (0.5 + 0.5 * sp);      // ход длиннее
+    this.suspK = (total * REF_G / def.axles.length) / def.susp.sag;
+    // вдвое больше демпфирования — вот и «мягче приземления»
+    this.suspC = 2 * Math.sqrt(this.suspK * (total / def.axles.length)) * def.susp.damp * sp;
+    // а «реже кувырки» — это запас у головы водителя: с прокачанной
+    // подвеской машина успевает выпрямиться там, где стоковая уже авария
+    this.headSlack = 9 + 9 * (sp - 1);
 
     // колёса. Радиус и масса берутся с оси, если она их задаёт —
     // так у трактора заднее колесо больше переднего.
@@ -256,15 +267,17 @@ window.HC = window.HC || {};
       }
       // отдача двигателя на кузов: ровно та тяга, что ушла в землю.
       // Из-за неё машина и встаёт на дыбы — но только когда колесо реально гребёт.
-      this.angVel -= j * w.r * (this.def.react || 1) / this.I;
+      this.angVel -= j * w.r * this.reactK / this.I;
     }
 
     /* 4. Кузов и земля */
+    var hullTouch = false;
     for (i = 0; i < this.hull.length; i++) {
       var p = this.worldPoint(this.hull[i][0], this.hull[i][1]);
       var ground = T.height(p.x);
       var pen2 = p.y - ground;
       if (pen2 <= 0) continue;
+      hullTouch = true;
       var n2 = T.normal(p.x);
       var rx2 = p.x - this.pos.x, ry2 = p.y - this.pos.y;
       var vx2 = this.vel.x - this.angVel * ry2;
@@ -286,7 +299,7 @@ window.HC = window.HC || {};
        Небольшой запас: голова может чиркнуть землю на крутой посадке и
        остаться цела. Без него любое сальто заканчивалось аварией. */
     var head = this.worldPoint(this.def.head[0], this.def.head[1]);
-    if (head.y > T.height(head.x) + 9) this.crashed = true;
+    if (head.y > T.height(head.x) + this.headSlack) this.crashed = true;
 
     /* 6. Управление в полёте.
        Включается не мгновенно, а за десятую долю секунды: иначе короткий
@@ -301,6 +314,19 @@ window.HC = window.HC || {};
         this.angVel -= throttle * this.airK * ramp * h;
         this.angVel = clamp(this.angVel, -this.airMax, this.airMax);
       }
+    }
+
+    /* 6б. На спине.
+       Голова может чудом не дотянуться до земли — но если машина лежит
+       колёсами вверх и уже чем-то касается земли, заезд кончен. Без этой
+       проверки перевёрнутая машина просто лежала бы, пока не истечёт
+       таймер «застряли». */
+    var na = Math.atan2(Math.sin(this.ang), Math.cos(this.ang));
+    if ((anyContact || hullTouch) && Math.abs(na) > 2.1) {
+      this.upT = (this.upT || 0) + h;
+      if (this.upT > 0.5) this.crashed = true;
+    } else {
+      this.upT = 0;
     }
 
     /* 7. Сопротивление и качение */

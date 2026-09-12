@@ -55,7 +55,7 @@ window.HC = window.HC || {};
 
   /* Насыщающаяся сложность: первый километр меняет много, десятый — чуть. */
   Terrain.prototype.hard = function (x) {
-    return 1 - Math.pow(0.78, this.stage(x));
+    return 1 - Math.pow(0.62, this.stage(x));
   };
 
   /* --- Фигуры на трассе -----------------------------------
@@ -115,7 +115,7 @@ window.HC = window.HC || {};
       // высота считается от ширины: так крутизна фигуры всегда в рамках,
       // а не зависит от того, какие числа выпали
       var ratio = { ramp: 0.155, table: 0.18, gap: 0.30, bumps: 0.075 }[type];
-      var amp = w * ratio * (0.75 + hash(k, this.seed + 304) * 0.5);
+      var amp = w * ratio * (0.75 + hash(k, this.seed + 304) * 0.5) * (this.track.featAmp || 1);
       f = {
         type: type,
         cx: k * FEAT + w / 2 + hash(k, this.seed + 302) * (FEAT - w - 120),
@@ -150,13 +150,13 @@ window.HC = window.HC || {};
   Terrain.prototype.raw = function (x) {
     var t = this.track, s = this.seed, L = t.len;
     var k = this.hard(x);
-    var amp = t.amp * (1 + k * 0.62);
-    var rough = t.rough * (1 + k * 1.00);
+    var amp = t.amp * (1 + k * 1.10);
+    var rough = t.rough * (1 + k * 1.70);
     var h = vnoise(x / L, s) * amp;
     h += vnoise(x / (L * 0.43) + 17.3, s + 101) * amp * 0.45 * rough;
     h += vnoise(x / (L * 0.19) + 51.7, s + 202) * amp * 0.18 * rough;
     h += vnoise(x / (L * 3.10) + 7.10, s + 303) * amp * 1.10;   // длинная пологая волна
-    h += this.featureH(x) * (0.62 + 0.75 * k);                   // трамплины и ямы
+    h += this.featureH(x) * (0.78 + 1.00 * k);                   // трамплины и ямы
     h += this.duneH(x);                                          // дюны песочницы
     return h;
   };
@@ -169,7 +169,7 @@ window.HC = window.HC || {};
     var t = this.track;
     if (!t.dunes) return 0;
     var u = x / DUNE, i = Math.floor(u), f = u - i;
-    var amp = (36 + hash(i, this.seed + 131) * 72) * t.dunes * (1 + this.hard(x) * 0.5);
+    var amp = (34 + hash(i, this.seed + 131) * 64) * t.dunes * (1 + this.hard(x) * 0.5);
     var v = f < 0.78 ? f / 0.78 : (1 - f) / 0.22;
     v = v * v * (3 - 2 * v);
     return amp * v;
@@ -192,7 +192,7 @@ window.HC = window.HC || {};
     var warm = clamp((x - 2400) / 2400, 0, 1);
     if (warm <= 0) return 0;
     var n = vnoise(x / 640, this.seed + 141) + vnoise(x / 220, this.seed + 142) * 0.45;
-    return clamp((n + 0.28) / 0.85, 0, 1) * t.soft * warm * warm * (3 - 2 * warm);
+    return clamp((n + 0.42) / 0.9, 0, 1) * t.soft * warm * warm * (3 - 2 * warm);
   };
 
   /* Колесо продавило песок. */
@@ -219,23 +219,62 @@ window.HC = window.HC || {};
     }
   };
 
-  /* --- Поваленные стволы ---------------------------------
-     Сбитое дерево ложится поперёк дороги и становится настоящим бугром:
-     он входит в высоту поверхности, а значит в него упираются колёса,
-     днище и подвеска — без отдельной «логики столкновений».
+  /* --- Падающие и упавшие деревья ------------------------
+     Сбитое дерево не исчезает и не подменяется бревном рывком: оно
+     заваливается вокруг своего пня за три четверти секунды, разгоняясь
+     к земле, стукается и ещё чуть качается. Бугор в рельефе появляется
+     не сразу, а по мере того, как ствол ложится, — иначе машина
+     цеплялась бы за препятствие, которого ещё нет.
   */
-  var LOG_W = 74;          // полуширина бугра от бревна
-  var LOG_H = 30;          // насколько бревно торчит над землёй
+  var FALL = 0.75;         // сколько падает дерево, с
+  var LOG_H = 30;          // насколько ствол торчит над землёй
 
-  Terrain.prototype.dropLog = function (x, s) {
-    var k = Math.floor(x / TREE);
-    (this.logs[k] = this.logs[k] || []).push({
-      x: x, w: LOG_W * (0.8 + s * 0.3), h: LOG_H * (0.75 + s * 0.35), s: s
-    });
+  Terrain.prototype.dropLog = function (tr, dir) {
+    var len = 78 * tr.s;                       // длина ствола с кроной
+    var L = {
+      x0: tr.x, dir: dir, s: tr.s, kind: tr.kind,
+      t: 0, grow: 0, thud: false,
+      x: tr.x + dir * len * 0.5,               // центр бугра
+      w: len * 0.8,
+      h: LOG_H * (0.7 + tr.s * 0.1)
+    };
+    var k = Math.floor(L.x / TREE);
+    (this.logs[k] = this.logs[k] || []).push(L);
     this.hasLogs = true;
+    return L;
   };
 
-  /* Вклад брёвен в высоту: гладкий бугор (1-t^2)^2, через него надо
+  /* Ход падения. Возвращает те стволы, что стукнулись об землю именно
+     сейчас, — заезд по ним поднимает пыль и роняет глухой удар. */
+  Terrain.prototype.fallLogs = function (dt) {
+    var landed = null;
+    for (var k in this.logs) {
+      var list = this.logs[k];
+      for (var i = 0; i < list.length; i++) {
+        var L = list[i];
+        if (L.t >= 1.4) continue;
+        L.t += dt / FALL;
+        // бугор растёт вместе с укладкой ствола, без ступеньки
+        var g = clamp((L.t - 0.55) / 0.45, 0, 1);
+        L.grow = g * g * (3 - 2 * g);
+        if (!L.thud && L.t >= 1) {
+          L.thud = true;
+          (landed = landed || []).push(L);
+        }
+      }
+    }
+    return landed;
+  };
+
+  /* Угол наклона ствола: разгоняется к земле, потом чуть качается. */
+  function fallAngle(L) {
+    var t = Math.min(L.t, 1.4);
+    var f = Math.pow(Math.min(1, t), 1.7);
+    var wob = t > 1 ? Math.sin((t - 1) * 17) * 0.05 * (1.4 - t) / 0.4 : 0;
+    return L.dir * (Math.PI / 2 * f - wob);
+  }
+
+  /* Вклад стволов в высоту: гладкий бугор (1-t^2)^2 — через него надо
      переползать, но он не стена. */
   Terrain.prototype.logAt = function (x) {
     var k = Math.floor(x / TREE), h = 0;
@@ -244,10 +283,11 @@ window.HC = window.HC || {};
       if (!list) continue;
       for (var i = 0; i < list.length; i++) {
         var L = list[i];
+        if (L.grow <= 0) continue;
         var t = (x - L.x) / L.w;
         if (t <= -1 || t >= 1) continue;
         var c = 1 - t * t;
-        h += L.h * c * c;
+        h += L.h * L.grow * c * c;
       }
     }
     return h;
@@ -294,13 +334,17 @@ window.HC = window.HC || {};
       var t = this.track;
       var r1 = hash(k, this.seed + 7), r2 = hash(k, this.seed + 8), r3 = hash(k, this.seed + 9);
 
-      if (r1 < 0.055 * t.coinRate) {
-        var n = 2 + Math.floor(hash(k, this.seed + 11) * 3);
-        var arc = hash(k, this.seed + 12) < 0.4;
+      // Монетки лежат примерно через каждые сто метров и всегда низко:
+      // дотянуться до них должна любая машина, а не только прыгучая.
+      var every = (HC.ECON.coinEvery || 100) * HC.PPM;
+      var mark = Math.ceil(x0 / every) * every;
+      if (mark < x0 + CHUNK) {
+        var mk = Math.round(mark / every);
+        var cx0 = mark + (hash(mk, this.seed + 10) - 0.5) * every * 0.1;
+        var n = 2 + Math.floor(hash(mk, this.seed + 11) * 2.2 * t.coinRate);
         for (var i = 0; i < n; i++) {
-          var cx = x0 + 20 + i * 30;
-          var lift = arc ? Math.sin((i + 0.5) / n * Math.PI) * 90 : 0;
-          list.push({ id: k + ':c' + i, type: 'coin', x: cx, y: this.height(cx) - 40 - lift });
+          var cx = cx0 + i * 34;
+          list.push({ id: 'c' + mk + '.' + i, type: 'coin', x: cx, y: this.height(cx) - 30 });
         }
       }
       if (r2 < 0.011) {
@@ -319,7 +363,7 @@ window.HC = window.HC || {};
   /* Все предметы в диапазоне x (для отрисовки и сбора). */
   Terrain.prototype.itemsIn = function (x0, x1) {
     var out = [];
-    var k0 = Math.floor(x0 / CHUNK), k1 = Math.floor(x1 / CHUNK);
+    var k0 = Math.floor(x0 / CHUNK) - 2, k1 = Math.floor(x1 / CHUNK) + 2;
     for (var k = k0; k <= k1; k++) {
       var list = this.chunk(k);
       for (var i = 0; i < list.length; i++) {
@@ -335,27 +379,36 @@ window.HC = window.HC || {};
      Расставлены из семечка: пейзаж у трассы всегда свой,
      но от заезда к заезду не прыгает.
   */
-  var DEC = 74;     // шаг раскладки
+  var DEC = 150;    // шаг раскладки
+  var DEC_S = 3;    // во сколько раз крупнее сама обстановка
 
   Terrain.prototype.decorCell = function (k) {
     this.dec = this.dec || {};
     if (this.dec[k]) return this.dec[k];
     var set = HC.DECOR_SETS[this.trackId] || HC.DECOR_SETS.hills;
     var out = [];
+    // Рядом с монетками ничего не ставим: обстановка стала втрое крупнее и
+    // закрывала бы то, что нужно подобрать.
+    var every = (HC.ECON.coinEvery || 100) * HC.PPM;
+    var cx0 = k * DEC + DEC * 0.4;
+    if (Math.abs(cx0 - Math.round(cx0 / every) * every) < 110) {
+      this.dec[k] = out;
+      return out;
+    }
     var r = hash(k, this.seed + 41);
     if (r < 0.72) {
       out.push({
         type: set[Math.floor(hash(k, this.seed + 42) * set.length)],
         x: k * DEC + hash(k, this.seed + 43) * DEC * 0.8,
-        s: 0.75 + hash(k, this.seed + 44) * 0.5,
+        s: (0.75 + hash(k, this.seed + 44) * 0.5) * DEC_S,
         flip: hash(k, this.seed + 45) < 0.5
       });
       // иногда рядом встаёт второй предмет — получается кучка, а не строй
       if (hash(k, this.seed + 46) < 0.34) {
         out.push({
           type: set[Math.floor(hash(k, this.seed + 47) * set.length)],
-          x: k * DEC + 22 + hash(k, this.seed + 48) * DEC * 0.5,
-          s: 0.6 + hash(k, this.seed + 49) * 0.4,
+          x: k * DEC + 54 + hash(k, this.seed + 48) * DEC * 0.5,
+          s: (0.6 + hash(k, this.seed + 49) * 0.4) * DEC_S,
           flip: hash(k, this.seed + 50) < 0.5
         });
       }
@@ -384,12 +437,12 @@ window.HC = window.HC || {};
     var out = [];
     for (var k = Math.floor(x0 / TREE); k <= Math.floor(x1 / TREE); k++) {
       if (k * TREE < 900) continue;                 // у старта пусто
-      if (hash(k, this.seed + 61) > 0.32) continue;
+      if (hash(k, this.seed + 61) > 0.27) continue;
       var x = k * TREE + hash(k, this.seed + 62) * TREE * 0.7;
       out.push({
         id: k,
         x: x,
-        s: 0.95 + hash(k, this.seed + 63) * 0.55,
+        s: (0.95 + hash(k, this.seed + 63) * 0.55) * DEC_S,
         kind: hash(k, this.seed + 64) < 0.5 ? 'pine' : 'tree',
         broken: this.brokenTrees[k] || 0
       });
@@ -407,13 +460,13 @@ window.HC = window.HC || {};
   /* Мелочь на дальних холмах — только силуэты, для глубины. */
   Terrain.prototype.farDecorIn = function (x0, x1, seedOff) {
     var out = [];
-    var step = 150;
+    var step = 330;
     var set = this.track.far || ['pine', 'tree'];
     for (var k = Math.floor(x0 / step); k <= Math.floor(x1 / step); k++) {
       if (hash(k, this.seed + seedOff) < 0.5) {
         out.push({
           x: k * step + hash(k, this.seed + seedOff + 1) * step * 0.7,
-          s: 0.4 + hash(k, this.seed + seedOff + 2) * 0.25,
+          s: (0.4 + hash(k, this.seed + seedOff + 2) * 0.25) * DEC_S,
           type: set[Math.floor(hash(k, this.seed + seedOff + 3) * set.length)]
         });
       }
@@ -541,24 +594,24 @@ window.HC = window.HC || {};
     g.lineCap = 'butt';
 
     g.strokeStyle = P.road || P.groundDeep || P.ground;
-    g.lineWidth = 30 * z;
-    trace(15 * z);
+    g.lineWidth = 38 * z;
+    trace(19 * z);
     g.stroke();
 
     g.strokeStyle = P.roadLine || P.bodyFill;
     g.globalAlpha = 0.85;
     g.lineWidth = Math.max(1.5, 3 * z);
-    trace(2 * z);
+    trace(2.5 * z);
     g.stroke();
 
     // разметка по середине полотна
-    var period = 46 * z;
+    var period = 56 * z;
     var x0 = cam.x + (pts[0].sx - W / 2) / z;     // мир в начале ломаной
-    g.setLineDash([26 * z, 20 * z]);
+    g.setLineDash([32 * z, 24 * z]);
     g.lineDashOffset = -((x0 * z) % period);
     g.globalAlpha = 0.62;
-    g.lineWidth = Math.max(1.2, 2.6 * z);
-    trace(15 * z);
+    g.lineWidth = Math.max(1.2, 3 * z);
+    trace(19 * z);
     g.stroke();
     g.setLineDash([]);
     g.restore();
@@ -569,7 +622,7 @@ window.HC = window.HC || {};
      Рисуется в мировых координатах, до машины — то есть позади неё. */
   Terrain.prototype.drawRail = function (g, x0, x1, P) {
     if (!this.track.rail) return;
-    var step = 62, x;
+    var step = 84, x;
     g.save();
     g.strokeStyle = P.ink;
     g.lineCap = 'round';
@@ -580,16 +633,16 @@ window.HC = window.HC || {};
     for (x = Math.floor(x0 / step) * step; x < x1; x += step) {
       var y = this.height(x);
       g.moveTo(x, y + 2);
-      g.lineTo(x, y - 38);
+      g.lineTo(x, y - 62);
     }
     g.stroke();
 
     g.globalAlpha = 0.7;
-    g.lineWidth = 4.5;
+    g.lineWidth = 6;
     var first = true;
     g.beginPath();
     for (x = Math.floor(x0 / 18) * 18; x < x1; x += 18) {
-      var yy = this.height(x) - 34;
+      var yy = this.height(x) - 56;
       if (first) { g.moveTo(x, yy); first = false; } else g.lineTo(x, yy);
     }
     g.stroke();
@@ -597,49 +650,40 @@ window.HC = window.HC || {};
     g.globalAlpha = 1;
   };
 
-  /* Лежащий ствол. Препятствие уже сидит в высоте поверхности, поэтому
-     здесь только сам ствол: он лежит в бугре, нижняя половина в земле. */
+  /* Дерево в падении и после него. Крутится вокруг своего пня, поэтому
+     выглядит как настоящее падение, а не как подмена картинки. */
   Terrain.prototype.drawLog = function (g, L, P) {
-    // земля без самого бревна — иначе ствол повис бы над своим же бугром
-    var ground = this.height(L.x) + this.logAt(L.x);
-    var len = L.w * 1.5;
-    var hgt = L.h + 10;
-    var top = ground - L.h - 1;
-
+    var ground = this.height(L.x0) + this.logAt(L.x0);   // земля без бугра
+    var ang = fallAngle(L);
+    var down = Math.min(1, L.t) * 4;        // ствол чуть просаживается в землю
     g.save();
-    g.translate(L.x, 0);
-    g.globalAlpha = 0.2;
+    // тень растёт и уезжает вместе с кроной
+    g.globalAlpha = 0.16 + 0.1 * Math.min(1, L.t);
     g.fillStyle = P.shadow || 'rgba(0,0,0,.2)';
     g.beginPath();
-    g.ellipse(6, ground + 2, len * 0.55, 6, 0, 0, 6.3);
+    g.ellipse(L.x0 + (L.x - L.x0) * Math.min(1, L.t), ground + 2,
+              Math.max(14 * L.s, L.w * 0.5 * Math.min(1, L.t)), 6 * L.s * 0.5, 0, 0, 6.3);
     g.fill();
     g.globalAlpha = 1;
 
-    var lg = g.createLinearGradient(0, top, 0, top + hgt);
-    lg.addColorStop(0, P.bodyHi || P.bodyFill);
-    lg.addColorStop(1, P.bodyShade || P.bodyFill);
-    g.fillStyle = lg;
-    g.strokeStyle = P.ink;
-    g.lineWidth = 2.4;
+    g.translate(L.x0, ground + down);
+    g.rotate(ang);
     g.lineJoin = 'round';
-    g.beginPath();
-    if (g.roundRect) g.roundRect(-len / 2, top, len, hgt, hgt / 2);
-    else g.rect(-len / 2, top, len, hgt);
-    g.fill();
-    g.stroke();
-
-    // срез с годовыми кольцами и пара сучьев
-    g.lineWidth = 1.5;
-    g.globalAlpha = 0.7;
-    g.beginPath();
-    g.ellipse(len / 2 - hgt / 2.6, top + hgt * 0.42, hgt * 0.16, hgt * 0.3, 0, 0, 6.3);
-    g.stroke();
-    g.beginPath();
-    g.moveTo(-len * 0.22, top + 3); g.lineTo(-len * 0.3, top - 16);
-    g.moveTo(len * 0.06, top + 2); g.lineTo(len * 0.16, top - 13);
-    g.stroke();
+    HC.Decor.draw(g, L.kind, P, L.s, false);
     g.restore();
-    g.globalAlpha = 1;
+
+    // у пня остаётся скол
+    g.save();
+    g.translate(L.x0, ground);
+    g.strokeStyle = P.ink;
+    g.fillStyle = P.bodyShade || P.bodyFill;
+    g.lineWidth = 2.4;
+    var r = 3.5 * L.s;
+    g.beginPath();
+    g.moveTo(-r, 2); g.lineTo(-r * 0.9, -r * 1.8);
+    g.lineTo(r * 0.9, -r * 1.5); g.lineTo(r, 2);
+    g.closePath(); g.fill(); g.stroke();
+    g.restore();
   };
 
   /* Облака. Рисуются в координатах экрана, поэтому заполняют небо
