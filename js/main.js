@@ -146,30 +146,67 @@ window.HC = window.HC || {};
         HC.save(self.state, true);
       });
 
-      // база: перетаскивание и нажатие по участку
+      // база: тянем в любую сторону, зумим колесом и щипком
       var c = this.canvas;
+      var ptrs = {}, pinch = null;
+      function count() { return Object.keys(ptrs).length; }
+
       c.addEventListener('pointerdown', function (e) {
         HC.Audio.unlock();
         if (self.scene !== 'base') return;
+        ptrs[e.pointerId] = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: 0 };
         HC.Base.dragging = true;
-        HC.Base.dragMoved = 0;
-        HC.Base.lastX = e.clientX;
         c.setPointerCapture(e.pointerId);
+        if (count() === 2) {
+          var ks = Object.keys(ptrs), a2 = ptrs[ks[0]], b2 = ptrs[ks[1]];
+          pinch = { d: Math.hypot(a2.x - b2.x, a2.y - b2.y), zoom: HC.Base.zoom };
+        }
       });
       c.addEventListener('pointermove', function (e) {
-        if (self.scene !== 'base' || !HC.Base.dragging) return;
-        var dx = e.clientX - HC.Base.lastX;
-        HC.Base.lastX = e.clientX;
-        HC.Base.dragMoved += Math.abs(dx);
-        HC.Base.pan -= dx / HC.Base.scale;
-      });
-      c.addEventListener('pointerup', function (e) {
         if (self.scene !== 'base') return;
-        HC.Base.dragging = false;
-        if (HC.Base.dragMoved > 8) return;           // это было перетаскивание, не нажатие
+        var p = ptrs[e.pointerId];
+        if (!p) return;
+        var dx = e.clientX - p.x, dy = e.clientY - p.y;
+        p.x = e.clientX; p.y = e.clientY;
+        p.moved += Math.abs(dx) + Math.abs(dy);
+        if (count() >= 2 && pinch) {
+          var ks2 = Object.keys(ptrs), a3 = ptrs[ks2[0]], b3 = ptrs[ks2[1]];
+          var d = Math.hypot(a3.x - b3.x, a3.y - b3.y);
+          var rect2 = c.getBoundingClientRect();
+          if (pinch.d > 12) {
+            HC.Base.setZoom(pinch.zoom * d / pinch.d,
+                            (a3.x + b3.x) / 2 - rect2.left, (a3.y + b3.y) / 2 - rect2.top);
+          }
+        } else {
+          HC.Base.panBy(dx, dy);
+        }
+      });
+      function endPtr(e) {
+        var p = ptrs[e.pointerId];
+        delete ptrs[e.pointerId];
+        if (count() < 2) pinch = null;
+        if (count() === 0) HC.Base.dragging = false;
+        if (self.scene !== 'base' || !p) return;
+        if (p.moved > 10) return;                    // это было перетаскивание
         var rect = c.getBoundingClientRect();
-        var i = HC.Base.hitTest(e.clientX - rect.left, e.clientY - rect.top, self.state);
+        var i = HC.Base.hitTest(p.sx - rect.left, p.sy - rect.top, self.state);
         if (i >= 0) { HC.Audio.click(); HC.UI.openPlot(i); }
+      }
+      c.addEventListener('pointerup', endPtr);
+      c.addEventListener('pointercancel', endPtr);
+
+      c.addEventListener('wheel', function (e) {
+        if (self.scene !== 'base') return;
+        e.preventDefault();
+        var rect = c.getBoundingClientRect();
+        HC.Base.zoomBy(e.deltaY < 0 ? 1.14 : 1 / 1.14, e.clientX - rect.left, e.clientY - rect.top);
+      }, { passive: false });
+
+      // кнопка «вся база»: отъехать и увидеть долину целиком
+      var fit = document.getElementById('btn-fit');
+      if (fit) fit.addEventListener('click', function () {
+        HC.Audio.click();
+        HC.Base.showAll();
       });
     },
 
