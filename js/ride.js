@@ -603,6 +603,8 @@ window.HC = window.HC || {};
       var T = this.terrain;
       var x0 = cam.x - W / cam.z * 0.7, x1 = cam.x + W / cam.z * 0.7;
 
+      // ЛЭП стоят дальше всего — рисуем первыми
+      T.drawPylons(g, x0, x1, P);
       // хайвэй: отбойник по обочине, позади машины
       T.drawRail(g, x0, x1, P);
 
@@ -612,7 +614,7 @@ window.HC = window.HC || {};
         var tr = trees[ti];
         if (tr.broken) continue;
         g.save();
-        g.translate(tr.x, T.height(tr.x));
+        g.translate(tr.x, T.plainAt(tr.x));
         HC.Decor.shadow(g, P, 20 * tr.s, 0.24);
         HC.Decor.draw(g, tr.kind, P, tr.s, false);
         g.restore();
@@ -624,12 +626,13 @@ window.HC = window.HC || {};
         for (var li = 0; li < logs.length; li++) T.drawLog(g, logs[li], P);
       }
 
-      var list = T.decorIn(cam.x - W / cam.z * 0.7, cam.x + W / cam.z * 0.7);
+      var list = T.decorIn(x0, x1);
       for (var i = 0; i < list.length; i++) {
         var d = list[i];
-        var y = T.height(d.x);
+        // обстановка стоит на чистой земле: камень — на своём месте, а не
+        // на собственном бугре
         g.save();
-        g.translate(d.x, y);
+        g.translate(d.x, T.plainAt(d.x));
         HC.Decor.shadow(g, P, 16 * d.s, 0.22);
         HC.Decor.draw(g, d.type, P, d.s, d.flip);
         g.restore();

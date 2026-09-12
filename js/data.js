@@ -123,7 +123,7 @@ window.HC = window.HC || {};
       grip: 1.20, roll: 0.60,
       coinRate: 1.00, oreRate: 0.08, payout: 1.60,
       far: ['pole', 'lamp', 'tower'],
-      road: 1, rail: 1, featAmp: 2.2,
+      road: 1, rail: 1, pylons: 1, featAmp: 2.2,
       feats: { ramp: 0.44, table: 0.38, bumps: 0.18 },
       goals: [ 400, 900, 1600 ]
     },
@@ -171,6 +171,9 @@ window.HC = window.HC || {};
     return m;
   };
 
+  /* Темы: две тихие и одна цветная — чтобы было что показать */
+  HC.THEME_NAMES = { paper: 'Бумага', dark: 'Тёмная', color: 'Цветная' };
+
   HC.DRIVE = {
     all:   { name: 'Полный',  about: 'Тяга на все колёса: лучше держит, спокойнее.' },
     rear:  { name: 'Задний',  about: 'Только задние: охотнее встаёт на дыбы.' },
@@ -211,35 +214,35 @@ window.HC = window.HC || {};
   */
   HC.BUILDINGS = {
     mine: {
-      name: 'Шахта', icon: 'mine', max: 12,
+      name: 'Шахта', icon: 'mine', limit: 6, max: 12,
       cost: 16500, costMult: 1.68, ore: 0, oreMult: 1.5, oreFrom: 6, oreBase: 12,
       about: 'Тихо стучит внутри холма и приносит монеты.',
       rate: 5.4, rateMult: 1.40, res: 'coins',
       build: 450, buildMult: 1.62
     },
     drill: {
-      name: 'Бур', icon: 'drill', max: 12,
+      name: 'Бур', icon: 'drill', limit: 3, max: 12,
       cost: 120000, costMult: 1.72, ore: 14, oreMult: 1.52, oreFrom: 1, oreBase: 14,
       about: 'Достаёт руду с глубины. Руда нужна для серьёзных вещей.',
       rate: 0.52, rateMult: 1.36, res: 'ore',
       build: 1500, buildMult: 1.60
     },
     storage: {
-      name: 'Склад', icon: 'storage', max: 12,
+      name: 'Склад', icon: 'storage', limit: 3, max: 12,
       cost: 27000, costMult: 1.64, ore: 0, oreMult: 1.5, oreFrom: 7, oreBase: 9,
       about: 'Сколько добра накопится, пока тебя нет.',
       capCoins: 340, capOre: 38, capMult: 1.52,
       build: 700, buildMult: 1.58
     },
     windmill: {
-      name: 'Ветряк', icon: 'windmill', max: 10,
+      name: 'Ветряк', icon: 'windmill', limit: 2, max: 10,
       cost: 81000, costMult: 1.76, ore: 6, oreMult: 1.55, oreFrom: 3, oreBase: 9,
       about: 'Крутится медленно. Ускоряет всё вокруг.',
       bonus: 0.08,   // +8% ко всей добыче за уровень
       build: 2000, buildMult: 1.60
     },
     workshop: {
-      name: 'Мастерская', icon: 'workshop', max: 10,
+      name: 'Мастерская', icon: 'workshop', limit: 1, max: 10,
       cost: 102000, costMult: 1.78, ore: 9, oreMult: 1.55, oreFrom: 2, oreBase: 12,
       about: 'Скидка на прокачку машины и больше монет с заездов.',
       discount: 0.025, // −2.5% к цене прокачки за уровень
@@ -247,35 +250,35 @@ window.HC = window.HC || {};
       build: 2400, buildMult: 1.62
     },
     garden: {
-      name: 'Сад', icon: 'garden', max: 8,
+      name: 'Сад', icon: 'garden', limit: 3, max: 8,
       cost: 60000, costMult: 1.70, ore: 0, oreMult: 1.5, oreFrom: 5, oreBase: 8,
       about: 'Ничего не производит. Просто держит время дольше.',
       offline: 1.2,   // +1.2 часа к копилке офлайна за уровень
       build: 1100, buildMult: 1.58
     },
     smelter: {
-      name: 'Плавильня', icon: 'smelter', max: 10,
+      name: 'Плавильня', icon: 'smelter', limit: 2, max: 10,
       cost: 54000, costMult: 1.68, ore: 9, oreMult: 1.5, oreFrom: 2, oreBase: 12,
       about: 'Переплавляет свежую руду в монеты. Без буров стоит холодная.',
       melt: 30, meltMult: 1.40, eats: 0.5,   // монет/мин и руды/мин за уровень
       build: 1600, buildMult: 1.60
     },
     garage: {
-      name: 'Гараж', icon: 'carport', max: 10,
+      name: 'Гараж', icon: 'carport', limit: 1, max: 10,
       cost: 78000, costMult: 1.56, ore: 6, oreMult: 1.5, oreFrom: 3, oreBase: 9,
       about: 'Машина ночует под крышей: бак больше, расход меньше.',
       fuel: 0.05, burn: 0.02,   // +5% к баку и −2% расхода за уровень
       build: 1800, buildMult: 1.56
     },
     radio: {
-      name: 'Радиовышка', icon: 'radio', max: 8,
+      name: 'Радиовышка', icon: 'radio', limit: 1, max: 8,
       cost: 105000, costMult: 1.60, ore: 8, oreMult: 1.5, oreFrom: 2, oreBase: 11,
       about: 'Ловит заказы издалека — за задания платят больше.',
       questBonus: 0.08,   // +8% к наградам заданий за уровень
       build: 2600, buildMult: 1.58
     },
     depot: {
-      name: 'Депо', icon: 'depot', max: 8,
+      name: 'Депо', icon: 'depot', limit: 1, max: 8,
       cost: 90000, costMult: 1.56, ore: 9, oreMult: 1.5, oreFrom: 2, oreBase: 12,
       about: 'Свозит добычу на склад само, пока игра открыта.',
       auto: 16,   // автосбор раз в 16/уровень минут
@@ -316,6 +319,7 @@ window.HC = window.HC || {};
     airBonus: 3,           // за каждую секунду в воздухе, если прыжок был долгий
     airMin: 1.1,           // с какого времени полёта идёт награда
     kmBonus: 6,            // за каждый километр: 6, 12, 18... — за риск
+    rushOrePerMin: 1,      // руды за минуту, которую снимаем со стройки
     offlineHoursBase: 3,   // базовый потолок офлайн-копилки
     startCoins: 0
   };

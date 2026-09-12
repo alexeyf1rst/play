@@ -12,10 +12,20 @@ window.HC = window.HC || {};
   HC.DECOR_SETS = {
     hills:  ['tree', 'tree', 'bush', 'pine', 'rock', 'fence', 'pole', 'grass', 'grass', 'lamp', 'crates'],
     sand:    ['cactus', 'cactus', 'rock', 'grass', 'bush', 'skull', 'crates'],
-    highway: ['lamp', 'sign', 'pole', 'cone', 'barrier', 'grass', 'billboard', 'lamp', 'sign'],
+    highway: ['lamp', 'sign', 'pole', 'grass', 'lamp', 'cone', 'sign', 'kmpost', 'barrier', 'pole', 'billboard', 'lamp'],
     forest:  ['pine', 'tree', 'bush', 'grass', 'rock', 'pine'],
     moon:   ['rock', 'rock', 'crater', 'flag', 'rock', 'crater'],
     base:   ['tree', 'bush', 'grass', 'rock', 'fence', 'pine']
+  };
+
+  /* Своя мера у каждого предмета: втрое крупнее должны стать деревья и
+     камни, а щит и без того огромный — иначе он заслоняет пол-экрана.
+     Множитель применяется при расстановке, поэтому камень-препятствие
+     ровно того же размера, что и нарисованный камень. */
+  HC.DECOR_SIZE = {
+    billboard: 0.5, barrier: 0.6, tower: 0.6, crates: 0.75, kmpost: 0.7,
+    fence: 0.8, sign: 0.85, skull: 0.7, crater: 0.8, flag: 0.8, flagpole: 0.7,
+    pole: 0.9, lamp: 0.95
   };
 
   /* Неровный кругляш одним контуром — крона дерева или куст.
@@ -278,6 +288,24 @@ window.HC = window.HC || {};
       for (var i = -3; i <= 3; i++) {
         g.moveTo(i * 8 - 4, -2); g.lineTo(i * 8 + 4, -18);
       }
+      g.stroke();
+      g.globalAlpha = 1;
+    },
+    /* Километровый столбик */
+    kmpost: function (g, P) {
+      g.strokeStyle = P.ink; g.lineWidth = 2.4; g.lineJoin = 'round';
+      var pg = g.createLinearGradient(0, -34, 0, 0);
+      pg.addColorStop(0, P.bodyHi || P.bodyFill);
+      pg.addColorStop(1, P.bodyShade || P.bodyFill);
+      g.fillStyle = pg;
+      g.beginPath();
+      if (g.roundRect) g.roundRect(-6, -34, 12, 34, 5); else g.rect(-6, -34, 12, 34);
+      g.fill(); g.stroke();
+      g.lineWidth = 1.6;
+      g.globalAlpha = 0.7;
+      g.beginPath();
+      g.moveTo(-4, -26); g.lineTo(4, -26);
+      g.moveTo(-4, -20); g.lineTo(2, -20);
       g.stroke();
       g.globalAlpha = 1;
     },

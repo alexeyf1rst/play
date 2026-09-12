@@ -57,6 +57,35 @@ window.HC = window.HC || {};
       }
       return done;
     },
+    /* Сколько таких построек уже стоит — вместе с теми, что строятся */
+    countOf: function (state, type) {
+      var p = state.base.plots, n = 0;
+      for (var i = 0; i < p.length; i++) if (p[i] && p[i].type === type) n++;
+      return n;
+    },
+    /* Сколько таких ещё можно поставить. Лимит — не жадность, а смысл:
+       восемь складов не нужны никому. */
+    limitLeft: function (state, type) {
+      var d = HC.BUILDINGS[type];
+      if (!d || !d.limit) return 99;
+      return Math.max(0, d.limit - this.countOf(state, type));
+    },
+    /* Ускорить стройку рудой: рубль за минуту, по-честному */
+    rushCost: function (plot) {
+      if (!plot || !plot.build) return 0;
+      return Math.max(1, Math.ceil(this.buildLeft(plot) / 60 * (HC.ECON.rushOrePerMin || 1)));
+    },
+    rush: function (state, index) {
+      var p = state.base.plots[index];
+      if (!p || !p.build) return false;
+      var cost = this.rushCost(p);
+      if (state.ore < cost) return false;
+      state.ore -= cost;
+      p.level = p.build.to;
+      delete p.build;
+      return true;
+    },
+
     /* Сколько стройки идёт прямо сейчас */
     building: function (state) {
       var p = state.base.plots, n = 0;
@@ -266,15 +295,18 @@ window.HC = window.HC || {};
     { gx: 4,  gy: 0,  t: 'tree',  s: 0.95 }, { gx: 10, gy: 0,  t: 'pine',  s: 1 },
     { gx: 16, gy: 0,  t: 'rock',  s: 0.9 },  { gx: 18, gy: 4,  t: 'tree',  s: 1 },
     { gx: 18, gy: 10, t: 'pine',  s: 0.95 }, { gx: 7,  gy: 12, t: 'tree',  s: 1 },
-    { gx: 13, gy: 12, t: 'bush',  s: 1 },    { gx: 1,  gy: 12, t: 'rock',  s: 0.85 },
+    { gx: 10, gy: 12, t: 'bush',  s: 1 },    { gx: 1,  gy: 12, t: 'rock',  s: 0.85 },
     { gx: 3,  gy: 3,  t: 'lamp',  s: 1 },    { gx: 9,  gy: 3,  t: 'lamp',  s: 1 },
     { gx: 15, gy: 3,  t: 'lamp',  s: 1 },    { gx: 3,  gy: 9,  t: 'lamp',  s: 1 },
     { gx: 9,  gy: 9,  t: 'lamp',  s: 1 },    { gx: 15, gy: 9,  t: 'lamp',  s: 1 },
     { gx: 6,  gy: 6,  t: 'grass', s: 1.1 },  { gx: 12, gy: 6,  t: 'grass', s: 1.1 },
-    { gx: 0,  gy: 0,  t: 'tower', s: 1 },    { gx: 17, gy: 12, t: 'flagpole', s: 1 },
+    { gx: 0,  gy: 0,  t: 'tower', s: 1 },    { gx: 18, gy: 12, t: 'flagpole', s: 1 },
     { gx: 6,  gy: 0,  t: 'crates', s: 0.9 }, { gx: 0,  gy: 7,  t: 'crates', s: 0.9 },
     { gx: 13, gy: 0, t: 'grass', s: 1 },     { gx: 18, gy: 7, t: 'bush', s: 0.9 }
   ];
+
+  /* Стоянка под машину — у въезда, за границей участков */
+  var LOT = { gx0: 13.2, gx1: 17.8, gy0: 12.08, gy1: 12.95 };
 
   /* Жители: ходят по дорогам туда и обратно */
   var FOLK = [
@@ -1069,9 +1101,16 @@ window.HC = window.HC || {};
         dep: COLS + ROWSN / 2 + 0.4, x: gate.x, y: gate.y,
         draw: function (g, P, it) { this.drawSign(g, P, it); }
       });
-      var park = iso(COLS - 0.9, ROWSN / 2 + 1.7);
+      // Стоянка: у машины своё место у въезда, чтобы она не стояла
+      // посреди построек.
+      var lot = iso(LOT.gx0 + (LOT.gx1 - LOT.gx0) / 2, LOT.gy0 + (LOT.gy1 - LOT.gy0) / 2);
       out.push({
-        dep: COLS + ROWSN / 2 + 0.9, x: park.x, y: park.y,
+        dep: LOT.gx0 + LOT.gy0, x: lot.x, y: lot.y,
+        draw: function (g, P, it) { this.drawLot(g, P); }
+      });
+      var park = iso(LOT.gx0 + 2.3, LOT.gy0 + 0.5);
+      out.push({
+        dep: LOT.gx0 + LOT.gy0 + 3.0, x: park.x, y: park.y,
         draw: function (g, P, it, st) { this.drawParked(g, P, st, it); }
       });
 
@@ -1304,6 +1343,52 @@ window.HC = window.HC || {};
       };
       HC.Vehicle.prototype.draw.call(fake, g, P);
       g.restore();
+    },
+
+    /* Асфальтовый пятачок под машину: бортик, разметка, знак */
+    drawLot: function (g, P) {
+      var a = iso(LOT.gx0, LOT.gy0), b = iso(LOT.gx1, LOT.gy0);
+      var c = iso(LOT.gx1, LOT.gy1), d = iso(LOT.gx0, LOT.gy1);
+      g.save();
+      g.fillStyle = P.road || P.groundDeep || P.ground;
+      g.globalAlpha = 0.85;
+      g.beginPath();
+      g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.lineTo(c.x, c.y); g.lineTo(d.x, d.y);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = P.ink;
+      g.globalAlpha = 0.3;
+      g.lineWidth = 1.8;
+      g.stroke();
+      // две разметочные линии — видно, что это место, а не пятно
+      g.strokeStyle = P.roadLine || P.bodyFill;
+      g.globalAlpha = 0.7;
+      g.lineWidth = 2.6;
+      for (var i = 1; i <= 3; i++) {
+        var gx = LOT.gx0 + i * (LOT.gx1 - LOT.gx0) / 4;
+        var p1 = iso(gx, LOT.gy0 + 0.08), p2 = iso(gx, LOT.gy1 - 0.08);
+        g.beginPath(); g.moveTo(p1.x, p1.y); g.lineTo(p2.x, p2.y); g.stroke();
+      }
+      // столбик с табличкой у края
+      var post = iso(LOT.gx0 + 0.2, LOT.gy0 + 0.2);
+      g.translate(post.x, post.y);
+      g.strokeStyle = P.ink;
+      g.globalAlpha = 0.85;
+      g.lineWidth = 2.6;
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -34); g.stroke();
+      g.fillStyle = P.panelSolid || P.sky0;
+      g.lineWidth = 2;
+      g.beginPath();
+      if (g.roundRect) g.roundRect(-13, -48, 26, 15, 4); else g.rect(-13, -48, 26, 15);
+      g.fill(); g.stroke();
+      g.globalAlpha = 0.75;
+      g.lineWidth = 1.6;
+      g.beginPath();
+      g.moveTo(-7, -40.5); g.lineTo(7, -40.5);
+      g.moveTo(-4, -44); g.lineTo(-4, -37);
+      g.stroke();
+      g.restore();
+      g.globalAlpha = 1;
     },
 
     /* Пустой участок: крестик по центру площадки */

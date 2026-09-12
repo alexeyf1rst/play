@@ -19,6 +19,21 @@ window.HC = window.HC || {};
       shadow: 'rgba(28,27,25,0.20)', vignette: 'rgba(60,55,45,0.12)', fore: '#9c968a', panelSolid: '#fbfaf8', sideFace: '#b2aca0',
       road: '#a8a29a', roadLine: '#f7f5f1'
     },
+    /* Цветная тема: те же чернила и те же формы, просто мир не серый.
+       Нужна, чтобы показывать игру людям, которым «чёрно-белое» непонятно. */
+    color: {
+      sky0: '#e2f1f8', sky1: '#bedded',
+      far0: '#b7d2c6', far1: '#96bcaa',
+      ground: '#b9cf92', hatch: '#6f8a5a', ink: '#22301e',
+      bodyFill: '#fff8e8', tyre: '#2c2a28', rim: '#e9e5db',
+      driver: '#fff8e8', coin: '#f0cc66', dust: '#a99f86',
+      groundTop: '#cbdea6', groundDeep: '#7f9a63',
+      bodyHi: '#fffdf5', bodyShade: '#e6d7bc',
+      tyreHi: '#4c4844', rimShade: '#c8c2b5',
+      shadow: 'rgba(32,46,22,0.22)', vignette: 'rgba(34,56,20,0.12)', fore: '#6d8a55',
+      panelSolid: '#fffdf7', sideFace: '#93ac74',
+      road: '#9d9c95', roadLine: '#f8f6f0'
+    },
     dark: {
       sky0: '#0f1012', sky1: '#191a1d',
       far0: '#212226', far1: '#2a2b30',
@@ -82,12 +97,15 @@ window.HC = window.HC || {};
 
     /* --- Тема и размеры ----------------------------------- */
     applyTheme: function () {
-      var dark = this.state.settings.theme === 'dark';
-      document.body.classList.toggle('theme-dark', dark);
-      this.P = PALETTES[dark ? 'dark' : 'paper'];
+      var name = PALETTES[this.state.settings.theme] ? this.state.settings.theme : 'paper';
+      document.body.classList.toggle('theme-dark', name === 'dark');
+      document.body.classList.toggle('theme-color', name === 'color');
+      this.P = PALETTES[name];
       HC.Base._thumbs = {};      // картинки перерисуются под новую тему
+      HC.Base._fill = null;      // и градиент корпуса тоже
       var meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute('content', dark ? '#0f1012' : '#f4f2ee');
+      var bar = { dark: '#0f1012', color: '#e2f1f8', paper: '#f4f2ee' }[name];
+      if (meta) meta.setAttribute('content', bar);
     },
 
     resize: function () {

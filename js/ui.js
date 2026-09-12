@@ -366,12 +366,18 @@ window.HC = window.HC || {};
           Object.keys(HC.BUILDINGS).forEach(function (bid) {
             var d = HC.BUILDINGS[bid];
             var cost = HC.costOf(d, 0), ore = HC.oreCostOf(d, 0);
-            html += '<div class="card">' + buildingPic(bid) +
-              '<div class="card-main"><h3>' + ic(d.icon || bid) + d.name + '</h3><p>' + d.about + '</p>' +
+            var have = HC.Economy.countOf(s, bid);
+            var left = HC.Economy.limitLeft(s, bid);
+            html += '<div class="card' + (left ? '' : ' locked') + '">' + buildingPic(bid) +
+              '<div class="card-main"><h3>' + ic(d.icon || bid) + d.name +
+              '<span class="lvl">' + have + ' / ' + d.limit + '</span></h3><p>' + d.about + '</p>' +
               '<p class="muted">' + UI.buildingEffect(bid, 1) + ' · ' +
               ic('clock', 'sm') + ' ' + HC.fmtTime(HC.buildTimeOf(d, 1)) + '</p></div>' +
-              '<div class="card-side"><button class="btn" data-build="' + bid + '" ' + (can(cost, ore) ? '' : 'disabled') + '>Строить</button>' +
-              priceTag(cost, ore) + '</div></div>';
+              '<div class="card-side">' +
+              (left ? '<button class="btn" data-build="' + bid + '" ' + (can(cost, ore) ? '' : 'disabled') + '>Строить</button>' +
+                      priceTag(cost, ore)
+                    : '<span class="done">больше не нужно</span>') +
+              '</div></div>';
           });
         } else if (plot.build) {
           // Стройка идёт. Улучшение не мешает работать: постройка остаётся
@@ -390,24 +396,32 @@ window.HC = window.HC || {};
             Math.round(HC.Economy.buildProgress(plot) * 100) + '%"></i></div>' +
             '<div class="stat"><span>' + ic('plus', 'sm') + 'станет</span><b>' +
             UI.buildingEffect(plot.type, to) + '</b></div>' +
+            '<div class="card"><div class="card-main"><h3>' + ic('ore') + 'Ускорить рудой</h3>' +
+            '<p>Руда идёт в дело и стройка заканчивается сразу. Цена — по минуте за единицу.</p></div>' +
+            '<div class="card-side"><button class="btn main" data-rush>Ускорить</button>' +
+            '<span class="price" data-rushprice>' + ic('ore') + HC.Economy.rushCost(plot) + '</span></div></div>' +
             '<button class="btn ghost wide" data-cancel>Отменить стройку (деньги вернутся полностью)</button>';
           tick = function (root) {
             var pl = G.state.base.plots[index];
             if (!pl || !pl.build) { UI.refresh(); return; }
             var lb = root.querySelector('[data-left]');
             var pg = root.querySelector('[data-prog]');
+            var rp = root.querySelector('[data-rushprice]');
             if (lb) lb.textContent = HC.fmtLeft(HC.Economy.buildLeft(pl));
             if (pg) pg.style.width = Math.round(HC.Economy.buildProgress(pl) * 100) + '%';
+            if (rp) rp.innerHTML = ic('ore') + HC.Economy.rushCost(pl);
           };
         } else {
           var d2 = HC.BUILDINGS[plot.type];
           title = d2.name + ' · уровень ' + plot.level;
+          var have2 = HC.Economy.countOf(s, plot.type);
           var maxed = plot.level >= d2.max;
           var cost2 = maxed ? 0 : HC.costOf(d2, plot.level);
           var ore2 = maxed ? 0 : HC.oreCostOf(d2, plot.level);
           var sec = maxed ? 0 : HC.buildTimeOf(d2, plot.level + 1);
           html = '<div class="hero">' + buildingPic(plot.type, 190, 140) + '<p>' + d2.about + '</p></div>' +
             '<div class="stat"><span>' + ic(d2.icon || plot.type, 'sm') + 'сейчас</span><b>' + UI.buildingEffect(plot.type, plot.level) + '</b></div>' +
+            '<div class="stat"><span>' + ic('plus', 'sm') + 'таких в долине</span><b>' + have2 + ' из ' + d2.limit + '</b></div>' +
             (maxed ? '' : '<div class="stat"><span>' + ic('plus', 'sm') + 'станет</span><b>' + UI.buildingEffect(plot.type, plot.level + 1) + '</b></div>' +
                           '<div class="stat"><span>' + ic('clock', 'sm') + 'стройка</span><b>' + HC.fmtTime(sec) + '</b></div>') +
             '<div class="card"><div class="card-main"><h3>' + (maxed ? 'Дальше некуда' : 'Улучшить до ' + (plot.level + 1)) + '</h3>' +
@@ -447,6 +461,23 @@ window.HC = window.HC || {};
               HC.save(G.state, true);
               UI.refresh();
             });
+            var rb = root.querySelector('[data-rush]');
+            if (rb) rb.addEventListener('click', function () {
+              var p = G.state.base.plots[index];
+              if (!p || !p.build) return;
+              var cost = HC.Economy.rushCost(p);
+              if (!HC.Economy.rush(G.state, index)) {
+                HC.Audio.deny();
+                UI.toast('Не хватает руды: нужно ' + cost);
+                return;
+              }
+              HC.Base.pop(index);
+              HC.Audio.build();
+              UI.toast('Готово — ушло ' + cost + ' руды');
+              HC.save(G.state, true);
+              UI.refresh();
+            });
+
             // Отменённая стройка возвращает всё: наказывать за передумал незачем.
             var cb = root.querySelector('[data-cancel]');
             if (cb) cb.addEventListener('click', function () {
@@ -631,38 +662,13 @@ window.HC = window.HC || {};
       });
     },
 
-    /* --- Настройки и сейвы -------------------------------- */
-    openSettings: function () {
+    /* --- Песочница: всё нечестное живёт здесь ------------- */
+    openCheats: function () {
       this.open(function () {
-        var s = G.state, st = s.stats, set = s.settings;
-        var r = HC.Economy.rates(s), cap = HC.Economy.capacity(s);
-        var html =
-          '<h4 class="sec">' + ic('sound') + 'Звук</h4>' +
-          '<label class="row switch"><span>Музыка</span><input type="checkbox" id="set-music" ' + (set.music ? 'checked' : '') + '></label>' +
-          '<label class="row slider"><span>Громкость</span><input type="range" id="set-mvol" min="0" max="100" value="' + Math.round(set.musicVol * 100) + '"></label>' +
-          '<label class="row switch"><span>Звуки</span><input type="checkbox" id="set-sfx" ' + (set.sfx ? 'checked' : '') + '></label>' +
-          '<label class="row slider"><span>Громкость</span><input type="range" id="set-svol" min="0" max="100" value="' + Math.round(set.sfxVol * 100) + '"></label>' +
-
-          '<h4 class="sec">' + ic('settings') + 'Вид</h4>' +
-          '<label class="row switch"><span>Тёмная тема</span><input type="checkbox" id="set-theme" ' + (set.theme === 'dark' ? 'checked' : '') + '></label>' +
-          '<label class="row switch"><span>Спокойный режим <em>(без пыли и частиц)</em></span><input type="checkbox" id="set-calm" ' + (set.calmMode ? 'checked' : '') + '></label>' +
-          '<label class="row switch"><span>Тряска камеры <em>(на приземлении)</em></span><input type="checkbox" id="set-shake" ' + (set.shake !== false ? 'checked' : '') + '></label>' +
-
-          '<h4 class="sec">' + ic('mine') + 'Добыча</h4>' +
-          '<div class="stat"><span>' + ic('coin', 'sm') + 'монет в минуту</span><b>' + HC.fmt1(r.coins) + '</b></div>' +
-          '<div class="stat"><span>' + ic('ore', 'sm') + 'руды в минуту</span><b>' + HC.fmt1(r.ore) + '</b></div>' +
-          '<div class="stat"><span>' + ic('storage', 'sm') + 'склад</span><b>' + money(cap.coins) + ' / ' + money(cap.ore) + '</b></div>' +
-          '<div class="stat"><span>' + ic('clock', 'sm') + 'копилка офлайна</span><b>' + HC.fmt1(HC.Economy.offlineHours(s)) + ' ч</b></div>' +
-
-          '<h4 class="sec">' + ic('chart') + 'Пройдено</h4>' +
-          '<div class="stat"><span>' + ic('repeat', 'sm') + 'заездов</span><b>' + st.runs + '</b></div>' +
-          '<div class="stat"><span>' + ic('road', 'sm') + 'всего метров</span><b>' + money(st.totalDistance) + '</b></div>' +
-          '<div class="stat"><span>' + ic('coin', 'sm') + 'всего монет заработано</span><b>' + money(st.totalCoins) + '</b></div>' +
-
-          '<h4 class="sec">' + ic('beaker') + 'Песочница <em>для проверки</em></h4>' +
-          '<p class="muted">Выдать себе ресурсы и всё открыть, чтобы посмотреть игру целиком. ' +
-          'Игра только твоя и офлайновая, так что портить тут нечего — но если хочешь честный ' +
-          'прогресс, сначала сохранись в файл.</p>' +
+        var html = '<p class="lead">Здесь можно выдать себе что угодно — чтобы посмотреть игру ' +
+          'целиком или показать её другому. В самой игре этих кнопок нет.</p>' +
+          '<p class="muted">Игра только твоя и офлайновая, портить тут нечего. Но если хочешь ' +
+          'честный прогресс — сначала сохранись в файл на вкладке «Настройки».</p>' +
           '<div class="row give">' +
           '<input type="number" id="give-coins" placeholder="монет" min="0" step="1000">' +
           '<input type="number" id="give-ore" placeholder="руды" min="0" step="100">' +
@@ -679,49 +685,10 @@ window.HC = window.HC || {};
           '<button class="btn" data-cheat="quests">Закрыть задания</button>' +
           '<button class="btn ghost" data-cheat="poor">Обнулить ресурсы</button>' +
           '</div>' +
-
-          '<h4 class="sec">' + ic('save') + 'Сохранение</h4>' +
-          '<p class="muted">Игра сама пишется в память браузера каждые несколько секунд. ' +
-          (HC.isMemoryOnly() ? '<b>Сейчас автосохранение недоступно</b> — браузер запретил запись. Сохраняйся в файл.' :
-           'Чтобы не потерять прогресс при чистке браузера — выгружай файл или код.') + '</p>' +
-          '<div class="row wrap">' +
-          '<button class="btn" id="save-file">Сохранить в файл</button>' +
-          '<button class="btn" id="save-code">Скопировать код</button>' +
-          '<button class="btn" id="load-file">Загрузить файл</button>' +
-          '</div>' +
-          '<textarea id="code-box" placeholder="Сюда можно вставить код сейва с другого устройства и нажать «Применить»"></textarea>' +
-          '<div class="row wrap"><button class="btn" id="apply-code">Применить код</button>' +
-          '<button class="btn ghost" id="wipe">Начать заново</button></div>' +
-          '<input type="file" id="file-input" accept=".json,application/json" hidden>';
-
+          '';
         return {
-          title: 'Настройки', html: html,
+          title: 'Песочница', html: html,
           bind: function (root) {
-            function onSet() { HC.Audio.applySettings(G.state.settings); HC.save(G.state, true); }
-            root.querySelector('#set-music').addEventListener('change', function (e) {
-              G.state.settings.music = e.target.checked; onSet(); UI.syncSound();
-              if (e.target.checked) HC.Audio.unlock();
-            });
-            root.querySelector('#set-sfx').addEventListener('change', function (e) {
-              G.state.settings.sfx = e.target.checked; onSet();
-            });
-            root.querySelector('#set-mvol').addEventListener('input', function (e) {
-              G.state.settings.musicVol = e.target.value / 100; HC.Audio.applySettings(G.state.settings);
-            });
-            root.querySelector('#set-svol').addEventListener('input', function (e) {
-              G.state.settings.sfxVol = e.target.value / 100; HC.Audio.applySettings(G.state.settings);
-            });
-            root.querySelector('#set-theme').addEventListener('change', function (e) {
-              G.state.settings.theme = e.target.checked ? 'dark' : 'paper';
-              G.applyTheme(); HC.save(G.state, true);
-            });
-            root.querySelector('#set-calm').addEventListener('change', function (e) {
-              G.state.settings.calmMode = e.target.checked; HC.save(G.state, true);
-            });
-            root.querySelector('#set-shake').addEventListener('change', function (e) {
-              G.state.settings.shake = e.target.checked; HC.save(G.state, true);
-            });
-
             function afterCheat(msg) {
               HC.Audio.build();
               UI.toast(msg);
@@ -783,6 +750,99 @@ window.HC = window.HC || {};
                   afterCheat('Ресурсы обнулены');
                 }
               });
+            });
+          }
+        };
+      });
+    },
+
+    /* --- Настройки и сейвы -------------------------------- */
+    openSettings: function () {
+      this.open(function () {
+        var s = G.state, st = s.stats, set = s.settings;
+        var r = HC.Economy.rates(s), cap = HC.Economy.capacity(s);
+        var html =
+          '<h4 class="sec">' + ic('sound') + 'Звук</h4>' +
+          '<label class="row switch"><span>Музыка</span><input type="checkbox" id="set-music" ' + (set.music ? 'checked' : '') + '></label>' +
+          '<label class="row slider"><span>Громкость</span><input type="range" id="set-mvol" min="0" max="100" value="' + Math.round(set.musicVol * 100) + '"></label>' +
+          '<label class="row switch"><span>Звуки</span><input type="checkbox" id="set-sfx" ' + (set.sfx ? 'checked' : '') + '></label>' +
+          '<label class="row slider"><span>Громкость</span><input type="range" id="set-svol" min="0" max="100" value="' + Math.round(set.sfxVol * 100) + '"></label>' +
+
+          '<h4 class="sec">' + ic('settings') + 'Вид</h4>' +
+          '<div class="tune"><div class="tune-head"><b>' + ic('settings', 'sm') + ' Тема</b></div><div class="seg">' +
+          ['paper', 'dark', 'color'].map(function (t) {
+            return '<button class="' + (set.theme === t ? 'on' : '') + '" data-theme="' + t + '">' +
+                   HC.THEME_NAMES[t] + '</button>';
+          }).join('') + '</div></div>' +
+          '<label class="row switch"><span>Спокойный режим <em>(без пыли и частиц)</em></span><input type="checkbox" id="set-calm" ' + (set.calmMode ? 'checked' : '') + '></label>' +
+          '<label class="row switch"><span>Тряска камеры <em>(на приземлении)</em></span><input type="checkbox" id="set-shake" ' + (set.shake !== false ? 'checked' : '') + '></label>' +
+
+          '<h4 class="sec">' + ic('mine') + 'Добыча</h4>' +
+          '<div class="stat"><span>' + ic('coin', 'sm') + 'монет в минуту</span><b>' + HC.fmt1(r.coins) + '</b></div>' +
+          '<div class="stat"><span>' + ic('ore', 'sm') + 'руды в минуту</span><b>' + HC.fmt1(r.ore) + '</b></div>' +
+          '<div class="stat"><span>' + ic('storage', 'sm') + 'склад</span><b>' + money(cap.coins) + ' / ' + money(cap.ore) + '</b></div>' +
+          '<div class="stat"><span>' + ic('clock', 'sm') + 'копилка офлайна</span><b>' + HC.fmt1(HC.Economy.offlineHours(s)) + ' ч</b></div>' +
+
+          '<h4 class="sec">' + ic('chart') + 'Пройдено</h4>' +
+          '<div class="stat"><span>' + ic('repeat', 'sm') + 'заездов</span><b>' + st.runs + '</b></div>' +
+          '<div class="stat"><span>' + ic('road', 'sm') + 'всего метров</span><b>' + money(st.totalDistance) + '</b></div>' +
+          '<div class="stat"><span>' + ic('coin', 'sm') + 'всего монет заработано</span><b>' + money(st.totalCoins) + '</b></div>' +
+
+          '<h4 class="sec">' + ic('beaker') + 'Песочница</h4>' +
+          '<p class="muted">Читерские кнопки — выдать ресурсы, всё открыть, достроить — ' +
+          'вынесены в отдельное окно, чтобы не мешать честной игре.</p>' +
+          '<div class="row"><button class="btn wide" id="open-cheats">' + ic('beaker') + 'Открыть песочницу</button></div>' +
+
+          '<h4 class="sec">' + ic('save') + 'Сохранение</h4>' +
+          '<p class="muted">Игра сама пишется в память браузера каждые несколько секунд. ' +
+          (HC.isMemoryOnly() ? '<b>Сейчас автосохранение недоступно</b> — браузер запретил запись. Сохраняйся в файл.' :
+           'Чтобы не потерять прогресс при чистке браузера — выгружай файл или код.') + '</p>' +
+          '<div class="row wrap">' +
+          '<button class="btn" id="save-file">Сохранить в файл</button>' +
+          '<button class="btn" id="save-code">Скопировать код</button>' +
+          '<button class="btn" id="load-file">Загрузить файл</button>' +
+          '</div>' +
+          '<textarea id="code-box" placeholder="Сюда можно вставить код сейва с другого устройства и нажать «Применить»"></textarea>' +
+          '<div class="row wrap"><button class="btn" id="apply-code">Применить код</button>' +
+          '<button class="btn ghost" id="wipe">Начать заново</button></div>' +
+          '<input type="file" id="file-input" accept=".json,application/json" hidden>';
+
+        return {
+          title: 'Настройки', html: html,
+          bind: function (root) {
+            function onSet() { HC.Audio.applySettings(G.state.settings); HC.save(G.state, true); }
+            root.querySelector('#set-music').addEventListener('change', function (e) {
+              G.state.settings.music = e.target.checked; onSet(); UI.syncSound();
+              if (e.target.checked) HC.Audio.unlock();
+            });
+            root.querySelector('#set-sfx').addEventListener('change', function (e) {
+              G.state.settings.sfx = e.target.checked; onSet();
+            });
+            root.querySelector('#set-mvol').addEventListener('input', function (e) {
+              G.state.settings.musicVol = e.target.value / 100; HC.Audio.applySettings(G.state.settings);
+            });
+            root.querySelector('#set-svol').addEventListener('input', function (e) {
+              G.state.settings.sfxVol = e.target.value / 100; HC.Audio.applySettings(G.state.settings);
+            });
+            root.querySelectorAll('[data-theme]').forEach(function (b) {
+              b.addEventListener('click', function () {
+                G.state.settings.theme = b.getAttribute('data-theme');
+                HC.Audio.click();
+                G.applyTheme();
+                HC.save(G.state, true);
+                UI.refresh();
+              });
+            });
+            root.querySelector('#set-calm').addEventListener('change', function (e) {
+              G.state.settings.calmMode = e.target.checked; HC.save(G.state, true);
+            });
+            root.querySelector('#set-shake').addEventListener('change', function (e) {
+              G.state.settings.shake = e.target.checked; HC.save(G.state, true);
+            });
+
+            root.querySelector('#open-cheats').addEventListener('click', function () {
+              HC.Audio.click();
+              UI.openCheats();
             });
 
             root.querySelector('#save-file').addEventListener('click', function () {

@@ -31,6 +31,19 @@ body.theme-dark {
   --lift-in: inset 0 1px 0 rgba(255, 255, 255, .07);
 }
 
+body.theme-color {
+  --paper: #eef6e6;
+  --paper-2: #dfead2;
+  --ink: #22301e;
+  --ink-soft: #55684a;
+  --line: #c0d0aa;
+  --panel: #fbfdf6;
+  --shadow: 0 10px 40px rgba(34, 48, 24, .16);
+  --lift-1: 0 1px 2px rgba(34, 48, 24, .08), 0 2px 8px rgba(34, 48, 24, .06);
+  --lift-2: 0 2px 4px rgba(34, 48, 24, .12), 0 8px 22px rgba(34, 48, 24, .14);
+  --lift-in: inset 0 1px 0 rgba(255, 255, 255, .8);
+}
+
 * { box-sizing: border-box; }
 
 html, body {
