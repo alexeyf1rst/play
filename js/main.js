@@ -161,6 +161,19 @@ window.HC = window.HC || {};
         node.addEventListener('pointerup', set(false));
         node.addEventListener('pointercancel', set(false));
         node.addEventListener('pointerleave', set(false));
+        // Педаль держат долго, а долгое нажатие на телефоне — это лупа,
+        // выделение и «скопировать». Глушим всё это прямо на педали.
+        node.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+        node.addEventListener('touchend', set(false), { passive: false });
+      });
+
+      // то же самое для холста и вообще для всего: в игре выделять нечего
+      ['contextmenu', 'selectstart', 'dragstart'].forEach(function (ev) {
+        document.addEventListener(ev, function (e) {
+          var t = e.target;
+          if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+          e.preventDefault();
+        });
       });
 
       document.getElementById('btn-pause').addEventListener('click', function () { self.togglePause(); });

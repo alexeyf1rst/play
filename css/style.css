@@ -54,6 +54,13 @@ html, body {
   font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  /* На телефоне долгое нажатие на педаль запускало выделение текста —
+     с синими ручками поверх игры. Выделять в игре нечего, поэтому
+     запрещаем везде и возвращаем только там, где текст правда копируют. */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   overscroll-behavior: none;
   touch-action: none;
 }
@@ -475,6 +482,16 @@ html, body {
   touch-action: none;
 }
 .pedal:active { opacity: .95; transform: translateY(2px) scale(.95); box-shadow: var(--lift-1); }
+.pedal .i { width: 26px; height: 26px; pointer-events: none; }
+.pedal.back .i { transform: rotate(180deg); }
+
+/* Копировать нужно только код сейва и поля выдачи ресурсов */
+input, textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
 
 /* --- Окна ------------------------------------------------ */
 #modal {
