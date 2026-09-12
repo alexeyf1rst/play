@@ -272,6 +272,30 @@ window.HC = window.HC || {};
       cost: 4000, costMult: 1.66, ore: 0, oreMult: 1.5, oreFrom: 5, oreBase: 5,
       about: 'Ничего не производит. Просто держит время дольше.',
       offline: 1.5   // +1.5 часа к копилке офлайна за уровень
+    },
+    smelter: {
+      name: 'Плавильня', icon: 'smelter', max: 10,
+      cost: 3600, costMult: 1.62, ore: 6, oreMult: 1.5, oreFrom: 2, oreBase: 8,
+      about: 'Переплавляет свежую руду в монеты. Без буров стоит холодная.',
+      melt: 520, meltMult: 1.44, eats: 0.55   // монет/мин и руды/мин за уровень
+    },
+    garage: {
+      name: 'Гараж', icon: 'garage', max: 10,
+      cost: 5200, costMult: 1.50, ore: 4, oreMult: 1.5, oreFrom: 3, oreBase: 6,
+      about: 'Машина ночует под крышей: бак больше, расход меньше.',
+      fuel: 0.05, burn: 0.02   // +5% к баку и −2% расхода за уровень
+    },
+    radio: {
+      name: 'Радиовышка', icon: 'radio', max: 8,
+      cost: 7000, costMult: 1.55, ore: 5, oreMult: 1.5, oreFrom: 2, oreBase: 7,
+      about: 'Ловит заказы издалека — за задания платят больше.',
+      questBonus: 0.09   // +9% к наградам заданий за уровень
+    },
+    depot: {
+      name: 'Депо', icon: 'depot', max: 8,
+      cost: 6000, costMult: 1.50, ore: 6, oreMult: 1.5, oreFrom: 2, oreBase: 8,
+      about: 'Свозит добычу на склад само, пока игра открыта.',
+      auto: 16   // автосбор раз в 16/уровень минут
     }
   };
 

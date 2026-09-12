@@ -366,7 +366,7 @@ window.HC = window.HC || {};
       // добыча копится и на базе, и в заезде
       this.accum += dt;
       if (this.accum >= 1) {
-        HC.Economy.accrue(this.state, this.accum);
+        HC.Economy.accrue(this.state, this.accum, true);
         this.accum = 0;
         this.state.stats.playTime += 1;
         if (this.scene === 'base') HC.UI.refreshPending();

@@ -486,6 +486,10 @@ window.HC = window.HC || {};
       if (type === 'windmill') return '+' + Math.round(d.bonus * level * 100) + '% ко всей добыче';
       if (type === 'workshop') return '−' + Math.round(d.discount * level * 100) + '% к цене прокачки, +' + Math.round(d.ridebonus * level * 100) + '% монет с заездов';
       if (type === 'garden') return '+' + HC.fmt1(d.offline * level) + ' ч к копилке офлайна';
+      if (type === 'smelter') return '+' + HC.fmt(Math.round(d.melt * Math.pow(d.meltMult, level - 1))) + ' монет в минуту, ест ' + HC.fmt1(d.eats * level) + ' руды в минуту';
+      if (type === 'garage') return '+' + Math.round(d.fuel * level * 100) + '% к баку, −' + Math.round(d.burn * level * 100) + '% расхода';
+      if (type === 'radio') return '+' + Math.round(d.questBonus * level * 100) + '% к наградам за задания';
+      if (type === 'depot') return 'свозит добычу раз в ' + HC.fmt1(d.auto / level) + ' мин';
       return '';
     },
 

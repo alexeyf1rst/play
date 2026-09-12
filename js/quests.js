@@ -191,10 +191,13 @@ window.HC = window.HC || {};
       var q = list[index];
       if (q.c || !this.done(q)) return null;
       q.c = true;
-      state.coins += q.rc;
-      state.ore += q.ro;
-      state.stats.totalCoins += q.rc;
-      return { coins: q.rc, ore: q.ro };
+      // радиовышка накидывает сверху
+      var k = HC.Economy ? HC.Economy.questBonus(state) : 1;
+      var rc = Math.round(q.rc * k), ro = Math.round(q.ro * k);
+      state.coins += rc;
+      state.ore += ro;
+      state.stats.totalCoins += rc;
+      return { coins: rc, ore: ro };
     },
 
     text: function (q) {

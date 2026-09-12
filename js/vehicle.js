@@ -48,7 +48,10 @@ window.HC = window.HC || {};
     var airBase = def.airCtrl || 1;
     this.airK = HC.WORLD.airControl * airBase * airk;
     this.airMax = Math.max(3.6, Math.min(11.5, 5.6 * airBase * Math.sqrt(airk)));
-    this.maxFuel = def.fuel * E.fuel(lu.fuel);
+    // гараж на базе: бак больше, расход меньше
+    var st0 = (HC.Game && HC.Game.state && HC.Economy) ? HC.Game.state : null;
+    this.maxFuel = def.fuel * E.fuel(lu.fuel) * (st0 ? HC.Economy.garageFuel(st0) : 1);
+    this.burnK = st0 ? HC.Economy.garageBurn(st0) : 1;
     this.magnet = E.magnet(lu.magnet);
 
     // масса и момент инерции кузова
@@ -361,7 +364,7 @@ window.HC = window.HC || {};
 
     // топливо
     if (!this.crashed && this.fuel > 0) {
-      var use = this.def.burn * (0.45 + 0.55 * Math.abs(input.throttle)) * dt;
+      var use = this.def.burn * this.burnK * (0.45 + 0.55 * Math.abs(input.throttle)) * dt;
       this.fuel = Math.max(0, this.fuel - use);
     }
     // полёт и сальто
