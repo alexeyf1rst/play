@@ -123,7 +123,7 @@ window.HC = window.HC || {};
           this.airFlips++;
           // каждое следующее сальто в одном прыжке дороже предыдущего
           var n = this.airFlips;
-          var gain = HC.ECON.flipCoins * n;
+          var gain = Math.round(HC.coins(HC.ECON.flipCoins * n));
           this.coins += gain;
           this.floats.push({
             x: car.pos.x, y: car.pos.y - 78, t: 0, big: true,
@@ -134,7 +134,7 @@ window.HC = window.HC || {};
         }
       } else {
         if (car.airTime === 0 && this._lastAir > HC.ECON.airMin && !car.crashed && this.airFlips === 0) {
-          var ab = Math.round(this._lastAir * HC.ECON.airBonus);
+          var ab = Math.round(HC.coins(this._lastAir * HC.ECON.airBonus));
           this.coins += ab;
           this.floats.push({ x: car.pos.x, y: car.pos.y - 74, t: 0, big: true, text: 'ДОЛГИЙ ПРЫЖОК  +' + ab });
           HC.Audio.chime();
@@ -151,7 +151,7 @@ window.HC = window.HC || {};
         var km = Math.floor(car.distance / 1000);
         if (km > this.km) {
           this.km = km;
-          var kmGain = HC.ECON.kmBonus * km;
+          var kmGain = Math.round(HC.coins(HC.ECON.kmBonus * km));
           this.coins += kmGain;
           this.floats.push({
             x: car.pos.x, y: car.pos.y - 86, t: 0, big: true,
@@ -247,7 +247,7 @@ window.HC = window.HC || {};
       HC.Audio.engineStop();
       var st = this.game.state;
       var dist = Math.max(0, Math.floor(this.car.distance));
-      var distCoins = Math.floor(dist / 100 * HC.ECON.distancePer100 * this.track.payout);
+      var distCoins = Math.floor(HC.coins(dist / 100 * HC.ECON.distancePer100) * this.track.payout);
       var base = Math.floor(this.coins * this.track.payout);
       var prev = st.stats.best[this.trackId] || 0;
       var record = dist > prev;
@@ -422,7 +422,7 @@ window.HC = window.HC || {};
             // чем дальше уехал, тем дороже монетка — но не до бесконечности
             var steps = Math.min(Math.floor(car.distance / 100), HC.ECON.coinPer100Max);
             // округляем до десятых: иначе в подписи вылезает 1.6000000000000001
-            var val = Math.round((HC.ECON.coinPickup + HC.ECON.coinPer100 * steps) * 10) / 10;
+            var val = Math.round(HC.coins(HC.ECON.coinPickup + HC.ECON.coinPer100 * steps) * 10) / 10;
             this.addCoins(val, it.x, it.y);
             HC.Audio.coin();
           } else if (it.type === 'ore') {

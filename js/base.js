@@ -95,7 +95,9 @@ window.HC = window.HC || {};
     buildingRate: function (type, level) {
       var d = HC.BUILDINGS[type];
       if (!d.rate) return 0;
-      return d.rate * Math.pow(d.rateMult, level - 1);
+      var r = d.rate * Math.pow(d.rateMult, level - 1);
+      // руда одинаковая на всех сложностях, монеты — через множитель
+      return d.res === 'ore' ? r : HC.coins(r);
     },
     windmillBonus: function (state) {
       var b = 0;
@@ -120,9 +122,9 @@ window.HC = window.HC || {};
       return { coins: coins * m, ore: ore * m };
     },
     capacity: function (state) {
-      var c = 400, o = 40, d = HC.BUILDINGS.storage;
+      var c = HC.coins(400), o = 40, d = HC.BUILDINGS.storage;
       this.each(state, 'storage', function (p) {
-        c += d.capCoins * Math.pow(d.capMult, p.level - 1);
+        c += HC.coins(d.capCoins * Math.pow(d.capMult, p.level - 1));
         o += d.capOre * Math.pow(d.capMult, p.level - 1);
       });
       return { coins: Math.round(c), ore: Math.round(o) };
@@ -136,7 +138,7 @@ window.HC = window.HC || {};
         ore += d.eats * p.level;
       });
       // ветряк ускоряет и плавильню — он ускоряет всё вокруг
-      return { coins: coins * (1 + this.windmillBonus(state)), ore: ore };
+      return { coins: HC.coins(coins) * (1 + this.windmillBonus(state)), ore: ore };
     },
 
     /* Гараж: бак больше, расход меньше */
@@ -250,7 +252,7 @@ window.HC = window.HC || {};
     },
     plotCost: function (state) {
       var extra = state.base.unlocked - HC.PLOTS.free;
-      return Math.round(HC.PLOTS.cost * Math.pow(HC.PLOTS.mult, extra));
+      return Math.max(1, Math.round(HC.PLOTS.cost * Math.pow(HC.PLOTS.mult, extra) * HC.D.cost));
     }
   };
 

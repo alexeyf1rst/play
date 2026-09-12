@@ -67,6 +67,7 @@ window.HC = window.HC || {};
       this.canvas = document.getElementById('scene');
       this.g = this.canvas.getContext('2d');
       this.state = HC.load();
+      HC.setDiff(this.state.settings.diff);
       this.applyTheme();
 
       HC.UI.init(this);
@@ -292,7 +293,12 @@ window.HC = window.HC || {};
         document.getElementById('title').hidden = true;
         HC.Ride.stop();
         self.goBase();
-        if (self.state.stats.runs === 0 && !self.state.base.plots.some(Boolean)) self.showWelcome();
+        var fresh = self.state.stats.runs === 0 && !self.state.base.plots.some(Boolean);
+        if (fresh && !self.state.settings.diffPicked) {
+          // первый запуск: сначала спрашиваем, с какой руки играть
+          HC.UI.openDifficulty(function () { self.showWelcome(); });
+        }
+        else if (fresh) self.showWelcome();
         else if (self.pendingOffline) { HC.UI.showOffline(self.pendingOffline); self.pendingOffline = null; }
       });
     },
@@ -403,6 +409,7 @@ window.HC = window.HC || {};
 
     replaceState: function (st) {
       this.state = st;
+      HC.setDiff(st.settings.diff);
       this.applyTheme();
       HC.Audio.applySettings(st.settings);
       HC.save(st, true);

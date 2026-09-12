@@ -342,30 +342,73 @@ window.HC = window.HC || {};
     startCoins: 0
   };
 
+  /* --- Сложность -----------------------------------------
+     Числа выше описывают «Сложную» — она и есть базовая.
+     Остальные две получаются множителями: gain — во сколько раз больше
+     монет даётся и добывается, cost — во сколько раз дешевле всё стоит,
+     build — во сколько раз быстрее идёт стройка.
+  */
+  HC.DIFFS = {
+    easy: {
+      name: 'Лёгкая', order: 0,
+      about: 'Денег много, всё дешёвое, стройка быстрая. Чтобы просто покататься и посмотреть долину.',
+      gain: 12, cost: 0.10, build: 0.10
+    },
+    normal: {
+      name: 'Средняя', order: 1,
+      about: 'Ровный темп: первая шахта за десяток заездов, стройка в минутах. Так игра задумана.',
+      gain: 8, cost: 0.25, build: 0.30
+    },
+    hard: {
+      name: 'Сложная', order: 2,
+      about: 'Всё дорого и медленно, каждая монета на счету. Для тех, кто любит долгую игру.',
+      gain: 1, cost: 1, build: 1
+    }
+  };
+
+  HC.D = HC.DIFFS.normal;          // действующая сложность
+  HC.setDiff = function (name) {
+    HC.D = HC.DIFFS[name] || HC.DIFFS.normal;
+    return HC.D;
+  };
+  HC.diffName = function (name) {
+    return (HC.DIFFS[name] || HC.DIFFS.normal).name;
+  };
+
   /* --- Утилиты цены --------------------------------------- */
   HC.costOf = function (def, level) {
-    return Math.round(def.cost * Math.pow(def.costMult, level));
+    return Math.max(1, Math.round(def.cost * Math.pow(def.costMult, level) * HC.D.cost));
   };
   HC.oreCostOf = function (def, level) {
     if (level + 1 < (def.oreFrom || 0)) return 0;
     var base = def.oreBase || 0;
     if (!base) return 0;
     var step = (level + 1) - (def.oreFrom || 0);
-    return Math.round(base * Math.pow(def.oreMult || 1.5, step));
+    return Math.max(1, Math.round(base * Math.pow(def.oreMult || 1.5, step) * HC.D.cost));
   };
   /* Сколько секунд идёт стройка до уровня level (1 — первая постройка) */
   HC.buildTimeOf = function (def, level) {
     if (!def.build) return 0;
-    return Math.round(def.build * Math.pow(def.buildMult || 1.5, Math.max(0, level - 1)));
+    return Math.max(5, Math.round(def.build * Math.pow(def.buildMult || 1.5, Math.max(0, level - 1)) * HC.D.build));
   };
   HC.upCostOf = function (def, level, discount) {
-    var c = def.base * Math.pow(def.mult, level);
+    var c = def.base * Math.pow(def.mult, level) * HC.D.cost;
     return Math.max(1, Math.round(c * (1 - (discount || 0))));
   };
   HC.upOreCostOf = function (def, level) {
     if (level + 1 < (def.oreFrom || 0)) return 0;
     var step = (level + 1) - def.oreFrom;
-    return Math.round((def.oreBase || 0) * Math.pow(1.45, step));
+    return Math.max(1, Math.round((def.oreBase || 0) * Math.pow(1.45, step) * HC.D.cost));
+  };
+  /* Цена машины и монеты в заезде — тоже через сложность */
+  HC.carPrice = function (def) {
+    return Math.round((def.price || 0) * HC.D.cost);
+  };
+  HC.carOre = function (def) {
+    return def.priceOre ? Math.max(1, Math.round(def.priceOre * HC.D.cost)) : 0;
+  };
+  HC.coins = function (n) {
+    return n * HC.D.gain;
   };
 
   /* --- Форматирование чисел ------------------------------- */

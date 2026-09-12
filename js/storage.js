@@ -58,6 +58,8 @@ window.HC = window.HC || {};
         sfxVol: 0.5,
         theme: 'color',
         themePicked: false,
+        diff: 'normal',
+        diffPicked: false,
         calmMode: false,
         shake: true,
         showHints: true
@@ -151,6 +153,17 @@ window.HC = window.HC || {};
     // Пока игрок сам не выбрал тему, он видит новую по умолчанию —
     // цветную. Выбрал руками — больше не трогаем.
     if (!s.settings.themePicked) s.settings.theme = 'color';
+
+    // Сложность: у старого сейва она была ровно «Сложной», поэтому
+    // прогресс не должен поехать — оставляем её и не спрашиваем.
+    if (!HC.DIFFS[s.settings.diff]) s.settings.diff = 'normal';
+    var played = (s.stats && s.stats.runs > 0) || s.base.plots.some(function (p) { return !!p; }) ||
+                 s.coins > 0 || s.base.unlocked > HC.PLOTS.free;
+    if (!s.settings.diffPicked && played) {
+      s.settings.diff = 'hard';
+      s.settings.diffPicked = true;
+    }
+    HC.setDiff(s.settings.diff);
     s.created = num(s.created, now());
     return s;
   }

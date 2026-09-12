@@ -121,12 +121,14 @@ window.HC = window.HC || {};
     for (var k = 0; k < kinds.length && list.length < P.count; k++) {
       var kind = HC.QUEST_KINDS[kinds[k]];
       var base = kind.min + r() * (kind.max - kind.min);
+      // монетные цели растут вместе с доходом выбранной сложности
+      if (kinds[k].indexOf('coins') === 0) base *= HC.D.gain;
       var target = kind.mode === 'max'
         ? roundTo(base * Math.pow(kind.grow || 2, P.idx), kind.step)
         : roundTo(base * P.factor, kind.step);
       var q = { t: kinds[k], n: target, p: 0, c: false };
       if (kind.track) q.track = openTracks[Math.floor(r() * openTracks.length)] || 'hills';
-      q.rc = Math.round((P.coins[0] + r() * (P.coins[1] - P.coins[0])) / 5) * 5;
+      q.rc = Math.round(HC.coins(P.coins[0] + r() * (P.coins[1] - P.coins[0])) / 5) * 5;
       q.ro = Math.round(P.ore[0] + r() * (P.ore[1] - P.ore[0]));
       list.push(q);
     }

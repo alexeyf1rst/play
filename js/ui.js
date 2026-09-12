@@ -295,6 +295,7 @@ window.HC = window.HC || {};
           var v = HC.VEHICLES[id];
           var owned = !!s.owned[id];
           var active = s.vehicle === id;
+          var vp = HC.carPrice(v), vo = HC.carOre(v);
           html += '<div class="card' + (owned ? '' : ' locked') + '">' + vehiclePic(id) +
             '<div class="card-main"><h3>' + v.name + '</h3><p>' + v.about + '</p>' +
             '<p class="muted">' + (v.axles.length > 2 ? v.axles.length + ' оси · ' : '') +
@@ -303,7 +304,7 @@ window.HC = window.HC || {};
             '<div class="card-side">' +
             (active ? '<span class="done">выбрана</span>'
               : owned ? '<button class="btn main" data-pick="' + id + '">Выбрать</button>'
-              : '<button class="btn" data-buy-car="' + id + '" ' + (can(v.price, v.priceOre) ? '' : 'disabled') + '>Купить</button>' + priceTag(v.price, v.priceOre)) +
+              : '<button class="btn" data-buy-car="' + id + '" ' + (can(vp, vo) ? '' : 'disabled') + '>Купить</button>' + priceTag(vp, vo)) +
             '</div></div>';
         });
 
@@ -329,7 +330,7 @@ window.HC = window.HC || {};
             root.querySelectorAll('[data-buy-car]').forEach(function (b) {
               b.addEventListener('click', function () {
                 var id = b.getAttribute('data-buy-car'), v = HC.VEHICLES[id];
-                if (!pay(v.price, v.priceOre)) return;
+                if (!pay(HC.carPrice(v), HC.carOre(v))) return;
                 G.state.owned[id] = true;
                 G.state.vehicle = id;
                 if (!G.state.up[id]) {
@@ -662,6 +663,56 @@ window.HC = window.HC || {};
       });
     },
 
+    /* --- Сложность ---------------------------------------
+       Спрашиваем один раз, в начале игры, и потом её можно сменить
+       в настройках. Меняются только цены, доход и сроки стройки —
+       трассы и физика у всех одинаковые. */
+    openDifficulty: function (done) {
+      this.open(function () {
+        var ids = Object.keys(HC.DIFFS).sort(function (a, b) { return HC.DIFFS[a].order - HC.DIFFS[b].order; });
+        var now = G.state.settings.diff || 'normal';
+        var html = '<p class="lead">С какой руки играть? Это про деньги и время, ' +
+          'а не про то, насколько злые холмы: трассы, физика и машины у всех сложностей одни.</p>';
+        ids.forEach(function (id, n) {
+          var d = HC.DIFFS[id];
+          HC.setDiff(id);
+          var mine = HC.costOf(HC.BUILDINGS.mine, 0);
+          var sec = HC.buildTimeOf(HC.BUILDINGS.mine, 1);
+          html += '<div class="stage' + (now === id ? ' won' : '') + '">' +
+            '<div class="stage-no">' + (n + 1) + '</div>' +
+            '<div class="stage-main"><h3>' + ic('d' + (n + 1)) + d.name +
+            (now === id ? '<span class="medal m0">' + ic('check', 'sm') + 'выбрано</span>' : '') + '</h3>' +
+            '<p>' + d.about + '</p>' +
+            '<p class="muted">' + ic('coin', 'sm') + ' монет ×' + d.gain +
+            ' · ' + ic('hammer', 'sm') + ' первая шахта ' + money(mine) +
+            ' · ' + ic('clock', 'sm') + ' стройка ' + HC.fmtTime(sec) + '</p></div>' +
+            '<div class="stage-side"><button class="btn' + (now === id ? ' main' : '') +
+            '" data-diff="' + id + '">Выбрать</button></div></div>';
+        });
+        HC.setDiff(now);
+        return {
+          title: 'Сложность', html: html,
+          bind: function (root) {
+            root.querySelectorAll('[data-diff]').forEach(function (b) {
+              b.addEventListener('click', function () {
+                var id = b.getAttribute('data-diff');
+                G.state.settings.diff = id;
+                G.state.settings.diffPicked = true;
+                HC.setDiff(id);
+                HC.Audio.build();
+                HC.save(G.state, true);
+                UI.toast('Сложность: ' + HC.diffName(id));
+                UI.close();
+                UI.refreshTop();
+                UI.refreshPending();
+                if (done) done();
+              });
+            });
+          }
+        };
+      });
+    },
+
     /* --- Песочница: всё нечестное живёт здесь ------------- */
     openCheats: function () {
       this.open(function () {
@@ -768,6 +819,11 @@ window.HC = window.HC || {};
           '<label class="row switch"><span>Звуки</span><input type="checkbox" id="set-sfx" ' + (set.sfx ? 'checked' : '') + '></label>' +
           '<label class="row slider"><span>Громкость</span><input type="range" id="set-svol" min="0" max="100" value="' + Math.round(set.sfxVol * 100) + '"></label>' +
 
+          '<h4 class="sec">' + ic('d2') + 'Сложность</h4>' +
+          '<div class="stat"><span>' + ic('coin', 'sm') + 'сейчас</span><b>' + HC.diffName(set.diff) + '</b></div>' +
+          '<p class="muted">Меняет цены, доход и сроки стройки. Уже построенное и накопленное остаётся на месте.</p>' +
+          '<div class="row"><button class="btn wide" id="open-diff">' + ic('d2') + 'Сменить сложность</button></div>' +
+
           '<h4 class="sec">' + ic('settings') + 'Вид</h4>' +
           '<div class="tune"><div class="tune-head"><b>' + ic('settings', 'sm') + ' Тема</b></div><div class="seg">' +
           ['paper', 'dark', 'color'].map(function (t) {
@@ -841,6 +897,10 @@ window.HC = window.HC || {};
               G.state.settings.shake = e.target.checked; HC.save(G.state, true);
             });
 
+            root.querySelector('#open-diff').addEventListener('click', function () {
+              HC.Audio.click();
+              UI.openDifficulty();
+            });
             root.querySelector('#open-cheats').addEventListener('click', function () {
               HC.Audio.click();
               UI.openCheats();
