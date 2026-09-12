@@ -658,10 +658,11 @@ window.HC = window.HC || {};
       g.globalAlpha = 1;
       g.restore();
 
+      // верх плиты: в цветной теме это луг, в тихих — та же земля, что была
       var tg = g.createLinearGradient(0, n.y, 0, s.y);
-      tg.addColorStop(0, P.groundDeep || P.ground);
-      tg.addColorStop(0.4, P.ground);
-      tg.addColorStop(1, P.groundTop || P.ground);
+      tg.addColorStop(0, P.plateDeep || P.groundDeep || P.ground);
+      tg.addColorStop(0.4, P.plate || P.ground);
+      tg.addColorStop(1, P.plate || P.groundTop || P.ground);
       g.fillStyle = tg;
       g.beginPath();
       g.moveTo(n.x, n.y); g.lineTo(e.x, e.y); g.lineTo(s.x, s.y); g.lineTo(w.x, w.y);
@@ -680,8 +681,9 @@ window.HC = window.HC || {};
     drawTiles: function (g, P) {
       var gx, gy, a, b, c, d;
       g.save();
-      g.fillStyle = P.groundTop || P.ground;
-      g.globalAlpha = 0.5;
+      // дорожки между участками: натоптанная земля, а не другой оттенок травы
+      g.fillStyle = P.path || P.groundTop || P.ground;
+      g.globalAlpha = P.path ? 0.5 : 0.5;
       g.beginPath();
       for (gx = 0; gx < COLS; gx++) {
         for (gy = 0; gy < ROWSN; gy++) {
@@ -738,7 +740,7 @@ window.HC = window.HC || {};
         g.moveTo(b.x, b.y); g.lineTo(c.x, c.y); g.lineTo(d.x, d.y);
         g.stroke();
         g.globalAlpha = 1 - s.fade * 0.6;
-        g.fillStyle = open ? P.ground : (P.groundTop || P.ground);
+        g.fillStyle = open ? (P.pad || P.ground) : (P.path || P.groundTop || P.ground);
         g.beginPath();
         g.moveTo(a.x, a.y - lift); g.lineTo(b.x, b.y - lift); g.lineTo(c.x, c.y - lift); g.lineTo(d.x, d.y - lift);
         g.closePath(); g.fill();

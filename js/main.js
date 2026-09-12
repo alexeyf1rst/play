@@ -28,8 +28,10 @@ window.HC = window.HC || {};
       wood: '#9c6b3f', woodHi: '#ba8452', woodDeep: '#6d4826',
       bone: '#efe6d6', metal: '#bcc1c7', panel: '#f4f0e8',
       shadow: 'rgba(30,40,20,0.24)', vignette: 'rgba(20,50,70,0.10)',
-      fore: '#2f6b2c', panelSolid: '#ffffff', sideFace: '#8fb37a',
-      road: '#6e7276', roadLine: '#f7f6f2'
+      fore: '#2f6b2c', panelSolid: '#ffffff', sideFace: '#a2793f',
+      road: '#6e7276', roadLine: '#f7f6f2',
+      // долина: трава, натоптанные дорожки и земляные площадки под постройки
+      plate: '#69b94f', plateDeep: '#4b9a38', path: '#e2cf9e', pad: '#b9834c'
     },
     paper: {
       sky0: '#f4f2ee', sky1: '#e2dfd8',
