@@ -473,11 +473,15 @@ window.HC = window.HC || {};
     // кузов: светлее сверху, темнее снизу — читается как объём
     var bb0 = 1e9, bb1 = -1e9;
     this.def.body.forEach(function (p) { bb0 = Math.min(bb0, p[1]); bb1 = Math.max(bb1, p[1]); });
+    // у кузова свой цвет: в цветной теме машина красная, а деревья зелёные
+    var cf = P.carFill || P.bodyFill;
+    var ch = P.carHi || P.bodyHi || cf;
+    var cs = P.carShade || P.bodyShade || cf;
     var bg = g.createLinearGradient(0, bb0, 0, bb1);
-    bg.addColorStop(0, P.bodyHi || P.bodyFill);
-    bg.addColorStop(0.48, P.bodyFill);
-    bg.addColorStop(0.52, P.bodyShade || P.bodyFill);
-    bg.addColorStop(1, P.bodyShade || P.bodyFill);
+    bg.addColorStop(0, ch);
+    bg.addColorStop(0.48, cf);
+    bg.addColorStop(0.52, cs);
+    bg.addColorStop(1, cs);
     g.fillStyle = bg;
     g.strokeStyle = P.ink;
     g.lineWidth = 2.6;
@@ -492,8 +496,8 @@ window.HC = window.HC || {};
     // водитель
     var hx = this.def.head[0], hy = this.def.head[1];
     var hg = g.createLinearGradient(hx - 8, hy - 4, hx + 8, hy + 12);
-    hg.addColorStop(0, P.bodyHi || P.driver);
-    hg.addColorStop(1, P.bodyShade || P.driver);
+    hg.addColorStop(0, P.driver);
+    hg.addColorStop(1, P.carShade ? P.driver : (P.bodyShade || P.driver));
     g.fillStyle = hg;
     g.beginPath(); g.arc(hx, hy + 4, 8, 0, Math.PI * 2); g.fill(); g.stroke();
     g.lineWidth = 5;

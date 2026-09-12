@@ -56,7 +56,8 @@ window.HC = window.HC || {};
         musicVol: 0.55,
         sfx: true,
         sfxVol: 0.5,
-        theme: 'paper',
+        theme: 'color',
+        themePicked: false,
         calmMode: false,
         shake: true,
         showHints: true
@@ -147,6 +148,9 @@ window.HC = window.HC || {};
     for (var key in d.settings) {
       if (typeof s.settings[key] !== typeof d.settings[key]) s.settings[key] = d.settings[key];
     }
+    // Пока игрок сам не выбрал тему, он видит новую по умолчанию —
+    // цветную. Выбрал руками — больше не трогаем.
+    if (!s.settings.themePicked) s.settings.theme = 'color';
     s.created = num(s.created, now());
     return s;
   }

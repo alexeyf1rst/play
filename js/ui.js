@@ -827,6 +827,7 @@ window.HC = window.HC || {};
             root.querySelectorAll('[data-theme]').forEach(function (b) {
               b.addEventListener('click', function () {
                 G.state.settings.theme = b.getAttribute('data-theme');
+                G.state.settings.themePicked = true;
                 HC.Audio.click();
                 G.applyTheme();
                 HC.save(G.state, true);

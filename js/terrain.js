@@ -530,24 +530,39 @@ window.HC = window.HC || {};
     g.fillRect(0, 0, W, H);
   };
 
-  /* Дальние холмы — просто для глубины, физики у них нет. */
+  /* Палитра под конкретную трассу. В цветной теме у песка свой песок,
+     у Луны — ночное небо и реголит; в тихих темах красить нечем, и
+     палитра возвращается как есть. */
+  Terrain.prototype.tint = function (P) {
+    if (!P.grass || !this.track.tint) return P;
+    var id = P.ink + ':' + this.trackId;
+    if (this._tintId !== id) {
+      var out = {}, k;
+      for (k in P) out[k] = P[k];
+      for (k in this.track.tint) out[k] = this.track.tint[k];
+      this._tint = out;
+      this._tintId = id;
+    }
+    return this._tint;
+  };
+
+  /* Дальние гряды — три плоских слоя, ближний темнее. Физики нет,
+     зато есть глубина: слои едут с разной скоростью. */
   Terrain.prototype.drawParallax = function (g, cam, W, H, P) {
     var layers = [
-      { k: 0.18, amp: 60, freq: 0.0016, y: H * 0.60, col: P.far0, seed: 41 },
-      { k: 0.34, amp: 80, freq: 0.0026, y: H * 0.72, col: P.far1, seed: 77 }
+      { k: 0.10, amp: 74, freq: 0.0011, y: H * 0.52, col: P.far0, seed: 41 },
+      { k: 0.22, amp: 88, freq: 0.0019, y: H * 0.64, col: P.far1, seed: 77 },
+      { k: 0.38, amp: 98, freq: 0.0029, y: H * 0.76, col: P.far2 || P.far1, seed: 133 }
     ];
     for (var l = 0; l < layers.length; l++) {
       var L = layers[l];
-      var lg = g.createLinearGradient(0, L.y - L.amp, 0, H);
-      lg.addColorStop(0, L.col);
-      lg.addColorStop(1, l === 0 ? (P.far1 || L.col) : (P.ground || L.col));
-      g.fillStyle = lg;
+      g.fillStyle = L.col;
       g.beginPath();
       g.moveTo(0, H);
-      for (var sx = 0; sx <= W; sx += 12) {
+      for (var sx = 0; sx <= W; sx += 10) {
         var wx = (cam.x * L.k + sx);
         var y = L.y + vnoise(wx * L.freq, this.seed + L.seed) * L.amp
-                    + vnoise(wx * L.freq * 3.1, this.seed + L.seed + 5) * L.amp * 0.3;
+                    + vnoise(wx * L.freq * 3.1, this.seed + L.seed + 5) * L.amp * 0.26;
         g.lineTo(sx, y);
       }
       g.lineTo(W, H);
@@ -556,7 +571,9 @@ window.HC = window.HC || {};
     }
   };
 
-  /* Земля: градиент вглубь, освещённая кромка и штриховка "от руки". */
+  /* Земля. Сверху дёрн широкой полосой, под ним грунт с градиентом в
+     глубину, по кромке — обводка. В тихих темах поверх идёт штриховка
+     «от руки»; в цветной она не нужна. */
   Terrain.prototype.drawGround = function (g, cam, W, H, P, quality) {
     var step = 6;
     var pts = [];
@@ -568,18 +585,19 @@ window.HC = window.HC || {};
       pts.push({ sx: sx, sy: sy });
     }
 
-    function trace() {
+    function trace(off) {
+      off = off || 0;
       g.beginPath();
-      g.moveTo(pts[0].sx, pts[0].sy);
-      for (var i = 1; i < pts.length; i++) g.lineTo(pts[i].sx, pts[i].sy);
+      g.moveTo(pts[0].sx, pts[0].sy + off);
+      for (var i = 1; i < pts.length; i++) g.lineTo(pts[i].sx, pts[i].sy + off);
     }
 
-    // тело земли — светлее у поверхности, темнее вглубь: появляется толщина
+    // тело земли
     var grad = g.createLinearGradient(0, top, 0, H + 40);
     grad.addColorStop(0, P.ground);
     grad.addColorStop(1, P.groundDeep || P.ground);
     g.fillStyle = grad;
-    trace();
+    trace(0);
     g.lineTo(W + step, H + 40);
     g.lineTo(-step, H + 40);
     g.closePath();
@@ -587,20 +605,33 @@ window.HC = window.HC || {};
 
     g.save();
     g.clip();
-
-    // освещённая полоса прямо под кромкой
-    g.strokeStyle = P.groundTop || P.ground;
-    g.globalAlpha = 0.95;
-    g.lineWidth = 8;
     g.lineJoin = 'round';
-    trace();
-    g.stroke();
-    g.globalAlpha = 1;
+    g.lineCap = 'round';
 
-    // хайвэй: вместо земляной кромки — полотно с разметкой
+    if (!this.track.road) {
+      var z = cam.z;
+      // дёрн: тёмная подложка, сама полоса и светлая бровка
+      g.strokeStyle = P.grassDeep || P.groundDeep || P.ground;
+      g.globalAlpha = 1;
+      g.lineWidth = 30 * z;
+      trace(15 * z);
+      g.stroke();
+      g.strokeStyle = P.grass || P.groundTop || P.ground;
+      g.lineWidth = 22 * z;
+      trace(9 * z);
+      g.stroke();
+      if (P.grassHi) {
+        g.strokeStyle = P.grassHi;
+        g.lineWidth = 7 * z;
+        trace(2 * z);
+        g.stroke();
+      }
+    }
+
+    // хайвэй: вместо дёрна полотно с кромками
     if (this.track.road) this.drawRoad(g, pts, cam, W, P);
 
-    if (quality !== 'low' && !this.track.road) {
+    if (quality !== 'low' && !this.track.road && P.hatchOn) {
       g.strokeStyle = P.hatch;
       g.lineWidth = 1;
       g.globalAlpha = 0.45;
@@ -619,9 +650,9 @@ window.HC = window.HC || {};
 
     // сама кромка
     g.strokeStyle = P.ink;
-    g.lineWidth = 2.5;
+    g.lineWidth = 3;
     g.lineJoin = 'round';
-    trace();
+    trace(0);
     g.stroke();
   };
 
@@ -865,16 +896,17 @@ window.HC = window.HC || {};
 
   HC.drawClouds = function (g, W, H, P, offset, horizon, time) {
     g.save();
-    g.fillStyle = P.far0;
-    g.globalAlpha = 0.5;
-    var span = W + 700;
-    for (var i = 0; i < 6; i++) {
-      var drift = offset * (0.10 + (i % 3) * 0.05) + (time || 0) * (3 + (i % 4) * 2);
-      var x = (((i * 421 - drift) % span) + span) % span - 350;
-      var y = horizon * (0.10 + 0.62 * ((i * 3) % 5) / 5);
-      cloud(g, x, y, 0.75 + ((i * 5) % 7) / 7 * 0.85);
+    g.fillStyle = P.cloud || P.far0;
+    g.globalAlpha = P.cloud ? 0.92 : 0.5;
+    var span = W + 900;
+    for (var i = 0; i < 9; i++) {
+      var drift = offset * (0.08 + (i % 3) * 0.05) + (time || 0) * (3 + (i % 4) * 2);
+      var x = (((i * 383 - drift) % span) + span) % span - 420;
+      var y = horizon * (0.08 + 0.66 * ((i * 3) % 5) / 5);
+      cloud(g, x, y, 0.95 + ((i * 5) % 7) / 7 * 1.15);
     }
     g.restore();
+    g.globalAlpha = 1;
   };
 
   /* Солнце днём, луна в тёмной теме. Висит почти неподвижно. */
@@ -882,6 +914,19 @@ window.HC = window.HC || {};
     var x = W * 0.78 - offset * 0.015;
     var y = H * 0.17;
     g.save();
+    if (P.sunGlow) {
+      // цветная тема: тёплое свечение и яркий диск
+      var gl = g.createRadialGradient(x, y, 10, x, y, 130);
+      gl.addColorStop(0, P.sunGlow);
+      gl.addColorStop(1, 'rgba(255,240,160,0)');
+      g.fillStyle = gl;
+      g.beginPath(); g.arc(x, y, 130, 0, 6.3); g.fill();
+      g.fillStyle = P.sun;
+      g.beginPath(); g.arc(x, y, 44, 0, 6.3); g.fill();
+      g.restore();
+      g.globalAlpha = 1;
+      return;
+    }
     g.globalAlpha = 0.5;
     g.fillStyle = P.far0;
     g.beginPath(); g.arc(x, y, 62, 0, 6.3); g.fill();

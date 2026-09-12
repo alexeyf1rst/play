@@ -114,6 +114,11 @@ window.HC = window.HC || {};
       coinRate: 1.10, oreRate: 0.14, payout: 1.35,
       far: ['cactus', 'rock'],
       dunes: 1, soft: 1,
+      // в цветной теме у песка свои цвета: дёрна нет, есть песок
+      tint: { grass: '#e9d189', grassHi: '#f6e4ae', grassDeep: '#c9a75c',
+              ground: '#ddbb6e', groundDeep: '#ab8340',
+              far0: '#e8e1b0', far1: '#dacd90', far2: '#cab972',
+              sky1: '#efe6c6', leaf: '#86b154', dust: '#e2caa0', fore: '#bb9648' },
       goals: [ 250, 600, 1100 ]
     },
     highway: {
@@ -124,6 +129,8 @@ window.HC = window.HC || {};
       coinRate: 1.00, oreRate: 0.08, payout: 1.60,
       far: ['pole', 'lamp', 'tower'],
       road: 1, rail: 1, pylons: 1, featAmp: 2.2,
+      tint: { ground: '#9c8e66', groundDeep: '#6d6343',
+              far0: '#abc4a8', far1: '#8bb08b', far2: '#6f9773', fore: '#5c6a44' },
       feats: { ramp: 0.44, table: 0.38, bumps: 0.18 },
       goals: [ 400, 900, 1600 ]
     },
@@ -134,6 +141,13 @@ window.HC = window.HC || {};
       grip: 0.90, roll: 0.90, featAmp: 0.8,
       coinRate: 1.05, oreRate: 0.40, payout: 2.10,
       far: ['rock'],
+      // Луна: ночное небо, серый реголит, тусклое солнце
+      tint: { sky0: '#1b2240', sky1: '#4a5680', cloud: '#7c87a8',
+              sun: '#eaeeff', sunGlow: 'rgba(220,230,255,0.30)',
+              grass: '#b4b1a8', grassHi: '#c9c6bd', grassDeep: '#8b8880',
+              ground: '#a29f97', groundDeep: '#6d6b65',
+              far0: '#7c8199', far1: '#676c83', far2: '#545971',
+              stone: '#bab7ae', stoneHi: '#d2cfc6', stoneDeep: '#8e8b83', fore: '#4b4a47' },
       goals: [ 400, 850, 1500 ]
     },
     forest: {
@@ -143,6 +157,10 @@ window.HC = window.HC || {};
       grip: 1.05, roll: 1.10,
       coinRate: 1.15, oreRate: 0.30, payout: 2.60,
       far: ['pine', 'tree'],
+      tint: { grass: '#47a038', grassHi: '#5eb849', grassDeep: '#2d7324',
+              ground: '#8a5f34', groundDeep: '#5d4022',
+              far0: '#84bf90', far1: '#5da070', far2: '#418459',
+              leaf: '#3e9635', leafHi: '#52ac43', leafDeep: '#2a6824', fore: '#245a20' },
       goals: [ 250, 650, 1200 ],
       trees: true
     }

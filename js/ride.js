@@ -480,6 +480,7 @@ window.HC = window.HC || {};
     /* --- Рисование ---------------------------------------- */
     draw: function (g, W, H, P) {
       var T = this.terrain, cam = this.cam;
+      P = T.tint(P);              // у каждой трассы свои цвета
       this.viewH = H;
       cam.z = clamp(Math.min(W / 700, H / 760) * (this.zoomK || 1), 0.44, 1.35);
 
@@ -722,17 +723,24 @@ window.HC = window.HC || {};
         var bob = Math.sin(this.time * 2 + it.x * 0.01) * 3;
         g.translate(0, bob);
         var cg = g.createRadialGradient(-4, -5, 1, 0, 0, 13);
-        cg.addColorStop(0, P.bodyHi || P.coin);
+        cg.addColorStop(0, P.coinHi || P.bodyHi || P.coin);
         cg.addColorStop(1, P.coin);
         g.fillStyle = cg;
         g.beginPath(); g.arc(0, 0, 11, 0, Math.PI * 2); g.fill(); g.stroke();
         g.lineWidth = 1.5;
         g.beginPath(); g.arc(0, 0, 6, 0, Math.PI * 2); g.stroke();
+        if (P.coinHi) {
+          // блик: монета читается как металл, а не как кружок
+          g.fillStyle = P.coinHi;
+          g.globalAlpha = 0.9;
+          g.beginPath(); g.ellipse(-3.5, -4.5, 2.6, 1.7, -0.6, 0, 6.3); g.fill();
+          g.globalAlpha = 1;
+        }
       } else if (it.type === 'fuel') {
         var fg = g.createLinearGradient(-11, 0, 11, 0);
-        fg.addColorStop(0, P.bodyHi || P.bodyFill);
-        fg.addColorStop(0.55, P.bodyFill);
-        fg.addColorStop(1, P.bodyShade || P.bodyFill);
+        fg.addColorStop(0, P.canHi || P.bodyHi || P.bodyFill);
+        fg.addColorStop(0.55, P.can || P.bodyFill);
+        fg.addColorStop(1, P.can ? P.can : (P.bodyShade || P.bodyFill));
         g.fillStyle = fg;
         g.beginPath();
         g.rect(-11, -14, 22, 28);

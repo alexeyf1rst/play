@@ -346,6 +346,30 @@ window.HC = window.HC || {};
      показывать назад. */
   var NO_FLIP = { sign: 1, billboard: 1 };
 
+  /* Из чего сделан предмет. В цветной теме листва зелёная, камень серый,
+     дерево — деревянное; в тихих темах красить нечем, и таблица молчит. */
+  var MADE_OF = {
+    tree: 'leaf', pine: 'leaf', bush: 'leaf', cactus: 'leaf', grass: 'leaf',
+    rock: 'stone', crater: 'stone', barrier: 'stone', kmpost: 'stone',
+    crates: 'wood', fence: 'wood', pole: 'wood',
+    skull: 'bone', lamp: 'metal', tower: 'metal',
+    billboard: 'panel', sign: 'panel', cone: 'can', flag: 'can', flagpole: 'can'
+  };
+  var tintCache = {};
+  function tinted(P, type) {
+    var key = MADE_OF[type];
+    if (!key || !P[key]) return P;
+    var id = P.ink + ':' + key;
+    if (tintCache[id]) return tintCache[id];
+    var out = {};
+    for (var k in P) out[k] = P[k];
+    out.bodyFill = P[key];
+    out.bodyHi = P[key + 'Hi'] || P[key];
+    out.bodyShade = P[key + 'Deep'] || P[key];
+    tintCache[id] = out;
+    return out;
+  }
+
   HC.Decor = {
     shapes: S,
     /* Нарисовать один предмет. Начало координат — точка на земле. */
@@ -356,7 +380,7 @@ window.HC = window.HC || {};
       if (scale !== 1) g.scale(scale, scale);
       if (flip && !NO_FLIP[type]) g.scale(-1, 1);
       g.lineJoin = 'round';
-      fn(g, P);
+      fn(g, tinted(P, type));
       g.restore();
     },
     /* Мягкая тень под предметом — он перестаёт быть наклейкой */

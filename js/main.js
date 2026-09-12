@@ -6,10 +6,35 @@ window.HC = window.HC || {};
   'use strict';
 
   var PALETTES = {
+    /* Цветная тема — та, в которой игру показывают людям: небо синее,
+       по кромке земли дёрн, под ним грунт, машина красная. Формы и
+       обводки те же, что и в тихих темах. */
+    color: {
+      sky0: '#5cb7e8', sky1: '#d6f0fb',
+      cloud: '#ffffff', sun: '#fff2a8', sunGlow: 'rgba(255,238,150,0.5)',
+      far0: '#9ed0ae', far1: '#79b98e', far2: '#5ea277',
+      grass: '#59b247', grassHi: '#71cb59', grassDeep: '#3b8733',
+      ground: '#b57c44', groundTop: '#59b247', groundDeep: '#7a5026',
+      hatch: '#8a5c31', ink: '#2a2018',
+      bodyFill: '#f7f2e7', bodyHi: '#fffdf7', bodyShade: '#ddd2be',
+      carFill: '#e04a3b', carHi: '#f4705f', carShade: '#a72e25',
+      driver: '#f6dcb8', tyre: '#2a2724', tyreHi: '#4c453d',
+      rim: '#ece8dd', rimShade: '#bdb6a8',
+      coin: '#f5c33f', coinHi: '#ffe484',
+      can: '#d94a38', canHi: '#f07a68',
+      dust: '#caa877',
+      leaf: '#57ad4b', leafHi: '#6ec95c', leafDeep: '#3a8232',
+      stone: '#a9a49b', stoneHi: '#c6c1b8', stoneDeep: '#7b766d',
+      wood: '#9c6b3f', woodHi: '#ba8452', woodDeep: '#6d4826',
+      bone: '#efe6d6', metal: '#bcc1c7', panel: '#f4f0e8',
+      shadow: 'rgba(30,40,20,0.24)', vignette: 'rgba(20,50,70,0.10)',
+      fore: '#2f6b2c', panelSolid: '#ffffff', sideFace: '#8fb37a',
+      road: '#6e7276', roadLine: '#f7f6f2'
+    },
     paper: {
       sky0: '#f4f2ee', sky1: '#e2dfd8',
-      far0: '#d5d2ca', far1: '#c3bfb5',
-      ground: '#ddd9d1', hatch: '#8e8b83', ink: '#1c1b19',
+      far0: '#d5d2ca', far1: '#c3bfb5', far2: '#b4b0a5',
+      ground: '#ddd9d1', hatch: '#8e8b83', ink: '#1c1b19', hatchOn: 1,
       bodyFill: '#faf9f6', tyre: '#2b2a27', rim: '#eceae5',
       driver: '#faf9f6', coin: '#e8e5de', dust: '#9b978f',
       // тона для объёма
@@ -19,25 +44,10 @@ window.HC = window.HC || {};
       shadow: 'rgba(28,27,25,0.20)', vignette: 'rgba(60,55,45,0.12)', fore: '#9c968a', panelSolid: '#fbfaf8', sideFace: '#b2aca0',
       road: '#a8a29a', roadLine: '#f7f5f1'
     },
-    /* Цветная тема: те же чернила и те же формы, просто мир не серый.
-       Нужна, чтобы показывать игру людям, которым «чёрно-белое» непонятно. */
-    color: {
-      sky0: '#e2f1f8', sky1: '#bedded',
-      far0: '#b7d2c6', far1: '#96bcaa',
-      ground: '#b9cf92', hatch: '#6f8a5a', ink: '#22301e',
-      bodyFill: '#fff8e8', tyre: '#2c2a28', rim: '#e9e5db',
-      driver: '#fff8e8', coin: '#f0cc66', dust: '#a99f86',
-      groundTop: '#cbdea6', groundDeep: '#7f9a63',
-      bodyHi: '#fffdf5', bodyShade: '#e6d7bc',
-      tyreHi: '#4c4844', rimShade: '#c8c2b5',
-      shadow: 'rgba(32,46,22,0.22)', vignette: 'rgba(34,56,20,0.12)', fore: '#6d8a55',
-      panelSolid: '#fffdf7', sideFace: '#93ac74',
-      road: '#9d9c95', roadLine: '#f8f6f0'
-    },
     dark: {
       sky0: '#0f1012', sky1: '#191a1d',
-      far0: '#212226', far1: '#2a2b30',
-      ground: '#1d1e21', hatch: '#3c3e43', ink: '#e9e8e4',
+      far0: '#212226', far1: '#2a2b30', far2: '#33343a',
+      ground: '#1d1e21', hatch: '#3c3e43', ink: '#e9e8e4', hatchOn: 1,
       bodyFill: '#2c2d32', tyre: '#0c0c0e', rim: '#3d3f45',
       driver: '#e9e8e4', coin: '#3a3c42', dust: '#5a5c62',
       groundTop: '#2b2c32', groundDeep: '#0e0f11',
@@ -104,7 +114,7 @@ window.HC = window.HC || {};
       HC.Base._thumbs = {};      // картинки перерисуются под новую тему
       HC.Base._fill = null;      // и градиент корпуса тоже
       var meta = document.querySelector('meta[name="theme-color"]');
-      var bar = { dark: '#0f1012', color: '#e2f1f8', paper: '#f4f2ee' }[name];
+      var bar = { dark: '#0f1012', color: '#5cb7e8', paper: '#f4f2ee' }[name];
       if (meta) meta.setAttribute('content', bar);
     },
 
