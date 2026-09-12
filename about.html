@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Тихие холмы — как это сделано</title>
+<meta name="description" content="Браузерная игра без единой картинки и без сборки: физика подвески, изометрическая долина с шахтами, три сложности и три темы. Страница проекта.">
+<meta name="theme-color" content="#5cb7e8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%235cb7e8'/%3E%3Ccircle cx='24.5' cy='8' r='4.2' fill='%23fff2a8'/%3E%3Cpath d='M0 21 Q8 15 16 19 T32 17 L32 32 L0 32 Z' fill='%23b57c44'/%3E%3Cpath d='M0 21 Q8 15 16 19 T32 17' stroke='%2359b247' stroke-width='4.5' fill='none'/%3E%3Crect x='10' y='13.5' width='10' height='4.5' rx='1.4' fill='%23e04a3b'/%3E%3Ccircle cx='12.5' cy='18.5' r='2.4' fill='%232a2018'/%3E%3Ccircle cx='18' cy='18.5' r='2.4' fill='%232a2018'/%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Тихие холмы">
+<meta property="og:title" content="Тихие холмы — как это сделано">
+<meta property="og:description" content="Браузерная игра без единой картинки и без сборки: физика подвески, долина с шахтами, три сложности и три темы.">
+<meta property="og:image" content="https://play-orpin-eight.vercel.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://play-orpin-eight.vercel.app/about.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://play-orpin-eight.vercel.app/og.png">
+<style>
+  :root {
+    --sky: #5cb7e8;
+    --sky-soft: #d6f0fb;
+    --paper: #f7f9f4;
+    --panel: #ffffff;
+    --ink: #22301e;
+    --ink-soft: #55684a;
+    --line: #d7e3cd;
+    --grass: #59b247;
+    --soil: #b57c44;
+    --car: #e04a3b;
+    --display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif;
+    --lift: 0 1px 2px rgba(34,48,24,.07), 0 8px 24px rgba(34,48,24,.10);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 20px; }
+  a { color: inherit; }
+
+  /* --- шапка --- */
+  header {
+    background: linear-gradient(180deg, var(--sky) 0%, var(--sky-soft) 100%);
+    padding: 56px 0 0;
+    text-align: center;
+    border-bottom: 3px solid var(--ink);
+  }
+  h1 {
+    font: 400 clamp(38px, 8vw, 66px)/1.05 var(--display);
+    margin: 0 0 10px;
+    letter-spacing: -.01em;
+  }
+  .tag {
+    font-size: 12px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--ink-soft); margin: 0 0 22px;
+  }
+  .lead { font-size: clamp(17px, 2.4vw, 20px); max-width: 640px; margin: 0 auto 26px; }
+  .cta {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--ink); color: #fff; text-decoration: none;
+    padding: 15px 30px; border-radius: 14px; font-weight: 600; font-size: 17px;
+    box-shadow: var(--lift);
+    transition: transform .12s ease;
+  }
+  .cta:active { transform: translateY(2px); }
+  .cta.ghost { background: var(--panel); color: var(--ink); border: 1.5px solid var(--ink); }
+  .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px; }
+  .hero-shot {
+    display: block; width: 100%; max-width: 900px; margin: 0 auto;
+    border-radius: 16px 16px 0 0;
+    border: 2px solid var(--ink); border-bottom: 0;
+    box-shadow: 0 -2px 40px rgba(34,48,24,.16);
+  }
+
+  /* --- блоки --- */
+  section { padding: 54px 0; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: 0; }
+  h2 {
+    font: 400 clamp(26px, 4vw, 34px)/1.2 var(--display);
+    margin: 0 0 8px;
+  }
+  .sub { color: var(--ink-soft); margin: 0 0 26px; }
+  p { margin: 0 0 16px; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 22px; }
+  .card {
+    background: var(--panel); border: 1.5px solid var(--line); border-radius: 14px;
+    padding: 18px 20px; box-shadow: var(--lift);
+  }
+  .card h3 { margin: 0 0 6px; font-size: 16px; }
+  .card p { margin: 0; color: var(--ink-soft); font-size: 15px; }
+  .card b { color: var(--ink); }
+
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-top: 8px; }
+  .fact { background: var(--panel); border: 1.5px solid var(--line); border-radius: 14px; padding: 16px; text-align: center; }
+  .fact b { display: block; font: 400 30px/1.1 var(--display); }
+  .fact span { font-size: 13px; color: var(--ink-soft); }
+
+  .shots { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .shots figure { margin: 0; }
+  .shots img {
+    display: block; width: 100%; border-radius: 12px;
+    border: 1.5px solid var(--ink); box-shadow: var(--lift);
+  }
+  .shots figcaption { font-size: 14px; color: var(--ink-soft); padding: 8px 2px 0; }
+  .shots .phone img {
+    max-height: 560px; width: auto; max-width: 100%;
+    margin: 0 auto; box-shadow: var(--lift);
+  }
+  .shots .phone { display: flex; flex-direction: column; align-items: center; }
+
+  ul.plain { margin: 0; padding-left: 20px; }
+  ul.plain li { margin-bottom: 8px; }
+
+  footer {
+    background: linear-gradient(180deg, var(--sky-soft) 0%, var(--grass) 100%);
+    border-top: 3px solid var(--ink);
+    padding: 46px 0 40px; text-align: center;
+  }
+  footer .small { font-size: 14px; color: var(--ink-soft); margin-top: 18px; }
+
+  @media (max-width: 640px) {
+    .shots { grid-template-columns: 1fr; }
+    .shots .tall { grid-row: auto; }
+    header { padding-top: 36px; }
+    section { padding: 40px 0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>Тихие холмы</h1>
+    <p class="tag">Холмы · монеты · шахты в долине</p>
+    <p class="lead">Браузерная игра из двух половин: заезды по холмам с настоящей физикой
+      подвески и долина с шахтами, которые работают, пока тебя нет. Ничего не надо
+      ставить — открыл ссылку и играешь, с телефона или с компьютера.</p>
+    <div class="ctas">
+      <a class="cta" href="index.html">▶ Играть</a>
+      <a class="cta ghost" href="#how">Как сделано</a>
+    </div>
+    <img class="hero-shot" src="shots/hills.png" alt="Красная машина едет по зелёным холмам">
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>Что это</h2>
+    <p class="sub">Две знакомые механики, сшитые в одну игру.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Заезды</h3>
+        <p>Кузов — твёрдое тело, колёса — точки на пружинах. Тяга крутит колесо, колесо
+          отталкивается от земли, а отдача двигателя пытается поставить машину на дыбы.
+          Никаких заранее записанных анимаций: <b>всё считается физикой</b>.</p>
+      </div>
+      <div class="card">
+        <h3>Долина</h3>
+        <p>Изометрическая база: 24 участка, десять типов построек, стройка по таймерам.
+          Время идёт <b>по часам, а не по кадрам</b> — закрыл игру, вернулся, всё достроено
+          и добыча накопилась.</p>
+      </div>
+      <div class="card">
+        <h3>Пять трасс</h3>
+        <p>И у каждой своё правило, а не своя раскраска: в песке колёса
+          <b>проваливаются</b>, в лесу сбитое дерево <b>падает и ложится поперёк дороги</b>,
+          на хайвэе асфальт и ЛЭП, на Луне гравитация вполсилы.</p>
+      </div>
+      <div class="card">
+        <h3>Три сложности</h3>
+        <p>Вопрос в самом начале: лёгкая, средняя, сложная. Трассы и физика одинаковые —
+          меняются только деньги и сроки стройки, <b>от трёх заездов до трёхсот</b> до
+          первой шахты.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Как выглядит</h2>
+    <p class="sub">Три темы: цветная, светлая «бумага» и тёмная. Переключается мгновенно.</p>
+    <div class="shots">
+      <figure>
+        <img src="shots/hills.png" alt="Заезд по холмам" loading="lazy">
+        <figcaption>Холмы: дёрн, грунт, три гряды на заднем плане</figcaption>
+      </figure>
+      <figure>
+        <img src="shots/forest.png" alt="Лес: падающее дерево" loading="lazy">
+        <figcaption>Лес: дерево заваливается вокруг пня и становится преградой</figcaption>
+      </figure>
+      <figure>
+        <img src="shots/base.png" alt="Долина с постройками" loading="lazy">
+        <figcaption>Долина: постройки связаны дорогами, трубами и проводами</figcaption>
+      </figure>
+      <figure>
+        <img src="shots/highway.png" alt="Хайвэй с ЛЭП" loading="lazy">
+        <figcaption>Хайвэй: полотно, отбойник и опоры ЛЭП с провисающими проводами</figcaption>
+      </figure>
+      <figure>
+        <img src="shots/moon.png" alt="Луна" loading="lazy">
+        <figcaption>Луна: ночь, реголит и гравитация вполсилы</figcaption>
+      </figure>
+      <figure class="phone">
+        <img src="shots/phone.png" alt="Игра на телефоне" loading="lazy">
+        <figcaption>На телефоне — две педали и тот же самый код</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>Как сделано</h2>
+    <p class="sub">Ванильный JavaScript и один холст. Ни одной библиотеки, ни одного шага сборки.</p>
+    <div class="facts">
+      <div class="fact"><b>0</b><span>зависимостей</span></div>
+      <div class="fact"><b>0</b><span>картинок и шрифтов из сети</span></div>
+      <div class="fact"><b>~8 000</b><span>строк кода</span></div>
+      <div class="fact"><b>560 КБ</b><span>весит целиком</span></div>
+      <div class="fact"><b>13</b><span>наборов автотестов</span></div>
+    </div>
+    <p style="margin-top:26px">
+      Вся графика рисуется кодом на <code>canvas</code>: холмы считаются из числа-семечка,
+      деревья и постройки собраны из кривых, а не из спрайтов. Звук тоже синтезируется
+      в браузере — двигатель это пила, частота которой идёт за оборотами ведущего колеса.
+      Поэтому игра открывается даже двойным щелчком по файлу, работает офлайн и ставится
+      на телефон как приложение.
+    </p>
+    <ul class="plain">
+      <li><b>Физика.</b> Пружины подвески считаются из массы машины, а не задаются руками,
+        поэтому любая новая машина едет корректно сразу.</li>
+      <li><b>Бесконечные трассы.</b> Рельеф детерминированный: одно и то же семечко даёт
+        одну и ту же трассу, поэтому баланс можно измерять, а не угадывать.</li>
+      <li><b>Проверки.</b> Тринадцать наборов на Playwright: от «нет ли NaN после четырёх
+        минут физики» до «через бревно можно переползти, и это не стена».</li>
+      <li><b>Сохранение.</b> Память браузера, файл <code>.json</code> и строка-код для
+        переноса между устройствами. Никаких серверов и аккаунтов.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a class="cta" href="index.html">▶ Играть</a>
+    <p class="small">Личный проект — сделан, чтобы проверить, сколько игры
+      влезает в один холст без библиотек.</p>
+  </div>
+</footer>
+
+</body>
+</html>
