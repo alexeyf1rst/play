@@ -380,9 +380,9 @@ window.HC = window.HC || {};
     var x0 = k * CHUNK;
     if (x0 > 420) {
       var t = this.track;
-      var r1 = hash(k, this.seed + 7), r2 = hash(k, this.seed + 8), r3 = hash(k, this.seed + 9);
+      var r3 = hash(k, this.seed + 9);
 
-      // Монетки лежат примерно через каждые сто метров и всегда низко:
+      // Монетки идут короткими цепочками и всегда лежат низко:
       // дотянуться до них должна любая машина, а не только прыгучая.
       var every = (HC.ECON.coinEvery || 100) * HC.PPM;
       var mark = Math.ceil(x0 / every) * every;
@@ -395,9 +395,9 @@ window.HC = window.HC || {};
           list.push({ id: 'c' + mk + '.' + i, type: 'coin', x: cx, y: this.height(cx) - 30 });
         }
       }
-      if (r2 < 0.011) {
-        var fx = x0 + 60;
-        list.push({ id: k + ':f', type: 'fuel', x: fx, y: this.height(fx) - 34 });
+      var fx = this.nextFuelX(x0);
+      if (fx < x0 + CHUNK) {
+        list.push({ id: 'fuel:' + Math.round(fx), type: 'fuel', x: fx, y: this.height(fx) - 34 });
       }
       if (r3 < 0.0018 + t.oreRate * 0.006) {
         var ox = x0 + 90;
@@ -406,6 +406,12 @@ window.HC = window.HC || {};
     }
     this.items[k] = list;
     return list;
+  };
+
+  // Канистры привязаны к расстоянию: игрок может планировать расход.
+  Terrain.prototype.nextFuelX = function (x) {
+    var every = HC.ECON.fuelEvery * HC.PPM, first = every / 2;
+    return first + Math.max(0, Math.ceil((x - first) / every)) * every;
   };
 
   /* Все предметы в диапазоне x (для отрисовки и сбора). */

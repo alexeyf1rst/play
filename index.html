@@ -135,19 +135,34 @@
   <div id="ride-top">
     <div class="hud-zone left">
       <div id="fuel-wrap"><i id="fuel-bar"></i></div>
-      <span class="hud-cap">топливо</span>
+      <span id="fuel-info" class="fuel-info">100% · канистра через 120 м</span>
     </div>
     <div class="hud-zone center">
       <span id="dist">0 м</span>
     </div>
     <div class="hud-zone right">
       <span class="run-coins"><svg class="i"><use href="#i-coin"/></svg><span id="run-coins">0</span></span>
+      <button id="btn-ride-sound" class="icon-btn" title="Включить музыку" aria-label="Включить музыку" aria-pressed="false">♪̸</button>
       <button id="btn-pause" class="icon-btn" title="Пауза" aria-label="Пауза"><svg class="i"><use href="#i-pause"/></svg></button>
     </div>
   </div>
+  <div id="ride-goal">
+    <div><b id="ride-goal-label">Бронза · 300 м</b><span id="ride-goal-left">ещё 300 м</span></div>
+    <div class="bar"><i id="ride-goal-bar"></i></div>
+  </div>
+  <p id="ride-hint" hidden></p>
+  <div id="ride-rescue" role="dialog" aria-modal="true" aria-labelledby="rescue-title" hidden>
+    <div class="rescue-card">
+      <span class="rescue-kicker">Одна помощь за заезд</span>
+      <h2 id="rescue-title">Дорога ещё впереди</h2>
+      <p id="rescue-reason"></p>
+      <button id="btn-recover" class="btn main wide">Вернуть на колёса · R</button>
+      <button id="btn-rescue-finish" class="btn wide">Забрать награду и закончить</button>
+    </div>
+  </div>
   <div id="pedals">
-    <button id="pedal-brake" class="pedal back" aria-label="Тормоз"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg></button>
-    <button id="pedal-gas" class="pedal" aria-label="Газ"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg></button>
+    <button id="pedal-brake" class="pedal back" aria-label="Тормоз" title="Тормоз"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg><span aria-hidden="true">Тормоз</span></button>
+    <button id="pedal-gas" class="pedal" aria-label="Газ" title="Газ"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg><span aria-hidden="true">Газ</span></button>
   </div>
 </div>
 

@@ -13,7 +13,7 @@ window.HC = window.HC || {};
   var timers = [];
   var padVoices = [];
   var windSrc = null;
-  var settings = { music: true, musicVol: 0.55, sfx: true, sfxVol: 0.5 };
+  var settings = { music: false, musicVol: 0.55, sfx: true, sfxVol: 0.5 };
 
   // Аккорды (номера MIDI). Медленная петля без разрешения — чтобы не тянуло к развязке.
   var CHORDS = [
@@ -295,7 +295,7 @@ window.HC = window.HC || {};
     },
 
     suspend: function () { if (ctx && ctx.state === 'running') ctx.suspend(); },
-    resume: function () { if (ctx && ctx.state === 'suspended' && settings.music) ctx.resume(); },
+    resume: function () { if (ctx && ctx.state === 'suspended' && (settings.music || settings.sfx)) ctx.resume(); },
 
     /* --- Короткие звуки. Все мягкие, без резких атак ------ */
     blip: function (freq, dur, vol, type) {

@@ -48,14 +48,55 @@ window.HC = window.HC || {};
       this.slowT = 0;        // замедление времени на сальто
       this.zoomK = 1;        // камера отъезжает на скорости
       this.wasAir = false;
+      this.recoveryUsed = false;
+      this.safeX = this.car.pos.x;
+      this.safeCheck = 0;
+      this.goal = this.nextGoal();
       HC.Audio.engineStart();
     },
 
     stop: function () { this.active = false; HC.Audio.engineStop(); },
 
+    nextGoal: function () {
+      var best = Math.max(this.game.state.stats.best[this.trackId] || 0, this.car.distance);
+      for (var i = 0; i < this.track.goals.length; i++) {
+        if (best < this.track.goals[i]) return { distance: this.track.goals[i], label: HC.MEDALS[i].name };
+      }
+      return { distance: Math.floor(best / 100 + 1) * 100, label: 'Следующий рубеж' };
+    },
+
+    offerRecovery: function () {
+      this.phase = 'rescue';
+      HC.Audio.engineStop();
+      this.game.clearInput();
+      document.getElementById('ride-rescue').hidden = false;
+      document.getElementById('btn-recover').focus();
+      document.getElementById('rescue-reason').textContent = this.car.crashed
+        ? 'Перевернулись. Есть ещё одна попытка.' : 'Застряли. Можно вернуться на удобный участок.';
+    },
+
+    recover: function () {
+      if (this.phase !== 'rescue' || this.recoveryUsed) return;
+      var car = this.car, fuel = car.fuel, distance = car.distance, startX = car.startX;
+      car.reset(this.safeX, true);
+      // Возвращение не создаёт новое топливо, монеты или расстояние.
+      car.fuel = fuel;
+      car.distance = distance;
+      car.startX = startX;
+      this.prevX = car.pos.x;
+      this.stuckT = 0;
+      this.shake = 0;
+      this.recoveryUsed = true;
+      this.phase = 'run';
+      this.game.clearInput();
+      document.getElementById('ride-rescue').hidden = true;
+      document.getElementById('btn-recover').blur();
+      HC.Audio.engineStart();
+    },
+
     /* --- Логика ------------------------------------------- */
     update: function (dt, input) {
-      if (!this.active || this.paused) return;
+      if (!this.active || this.paused || this.phase === 'rescue') return;
       dt = Math.min(dt, 1 / 30);
 
       // На большом сальто время чуть тянется — успеваешь увидеть, что делаешь.
@@ -75,6 +116,15 @@ window.HC = window.HC || {};
       }
       var thr = this.phase === 'run' ? input.throttle : 0;
       car.update(dt, { throttle: thr });
+      if (this.time >= this.safeCheck && !car.crashed && car.onGround && Math.abs(car.ang) < 0.3) {
+        this.safeCheck = this.time + 0.2;
+        var safe = true;
+        for (var sx = car.pos.x - 120; sx <= car.pos.x + 120; sx += 20) {
+          if (Math.abs(T.slope(sx)) > 0.18) { safe = false; break; }
+        }
+        if (safe) this.safeX = car.pos.x;
+      }
+      if (car.distance >= this.goal.distance) this.goal = this.nextGoal();
 
       // приземление: тряска, пыль из-под колёс и глухой удар
       if (wasAir && car.onGround && fallV > 240) {
@@ -191,9 +241,11 @@ window.HC = window.HC || {};
 
       // чем кончился заезд
       if (this.phase === 'run') {
-        if (car.crashed) this.beginEnd('Приехали');
-        else if (this.stuckT > 6) this.beginEnd('Застряли');
-        else if (car.fuel <= 0) this.beginEnd('Кончилось топливо');
+        if (car.fuel <= 0) this.beginEnd('Кончилось топливо');
+        else if (car.crashed || this.stuckT > 6) {
+          if (!this.recoveryUsed) this.offerRecovery();
+          else this.beginEnd(car.crashed ? 'Перевернулись' : 'Застряли');
+        }
       } else if (this.phase === 'ending') {
         this.endTimer += dt;
         var slow = car.speed < 20;
@@ -244,6 +296,7 @@ window.HC = window.HC || {};
       if (this.phase === 'done') return;
       this.phase = 'done';
       this.active = false;
+      document.getElementById('ride-rescue').hidden = true;
       HC.Audio.engineStop();
       var st = this.game.state;
       var dist = Math.max(0, Math.floor(this.car.distance));
@@ -257,7 +310,11 @@ window.HC = window.HC || {};
       // окажется «лучший результат undefined м»
       st.stats.best[this.trackId] = Math.max(prev, dist);
       var bonus = record ? Math.floor((base + distCoins) * HC.ECON.recordBonus) : 0;
-      var total = Math.floor((base + distCoins + bonus) * this.rideMul);
+      var medalBonus = 0;
+      for (var mi = medalBefore + 1; mi <= medalNow; mi++) {
+        medalBonus += Math.round(HC.coins(HC.ECON.medalCoins * (mi + 1)) * this.track.payout);
+      }
+      var total = Math.floor((base + distCoins + bonus) * this.rideMul) + medalBonus;
 
       var Q = HC.Quests;
       Q.report(st, 'dist_run', dist);
@@ -286,6 +343,7 @@ window.HC = window.HC || {};
         distCoins: distCoins,
         bonus: bonus,
         total: total,
+        medalBonus: medalBonus,
         ore: this.ore,
         flips: this.flips,
         cans: this.cans,

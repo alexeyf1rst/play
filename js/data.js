@@ -7,7 +7,7 @@ window.HC = window.HC || {};
 (function (HC) {
   'use strict';
 
-  HC.VERSION = '0.1.0';
+  HC.VERSION = '0.2.0';
   HC.SAVE_KEY = 'quiet-hills/save/v1';
 
   /* --- Физика мира --------------------------------------- */
@@ -43,7 +43,7 @@ window.HC = window.HC || {};
     scooter: {
       name: 'Скутер', order: 1,
       about: 'Маленькие колёса и лёгкая рама. Вертлявый и экономный, но каждая кочка — его враг.',
-      price: 260000, priceOre: 0,
+      price: 60000, priceOre: 0,
       mass: 4.6, power: 9000, fuel: 62, burn: 1.7, topSpeed: 410, react: 0.40, airCtrl: 1.85,
       drive: 'rear',
       wheel: { r: 14, mass: 0.8, grip: 0.90 },
@@ -55,7 +55,7 @@ window.HC = window.HC || {};
     bolid: {
       name: 'Болид', order: 2,
       about: 'Длинный, низкий, очень быстрый. На ровном никто не догонит, на кочках цепляет днищем.',
-      price: 1500000, priceOre: 90,
+      price: 300000, priceOre: 90,
       mass: 7.5, power: 21000, fuel: 125, burn: 3.1, topSpeed: 750, react: 0.80, airCtrl: 1.25,
       drive: 'rear',
       wheel: { r: 16, mass: 1.1, grip: 1.28 },
@@ -67,7 +67,7 @@ window.HC = window.HC || {};
     truck: {
       name: 'Трак', order: 3,
       about: 'Огромные колёса переезжают то, обо что спотыкаются остальные. Тяжёлый и стойкий.',
-      price: 4800000, priceOre: 340,
+      price: 900000, priceOre: 340,
       mass: 18, power: 27000, fuel: 190, burn: 3.8, topSpeed: 490, react: 0.90, airCtrl: 0.85,
       drive: 'all',
       wheel: { r: 36, mass: 3.1, grip: 1.32 },
@@ -79,7 +79,7 @@ window.HC = window.HC || {};
     rover: {
       name: 'Луноход', order: 4,
       about: 'Немного парит: в воздухе тянет вниз слабее, чем остальных. Липкое сцепление, долгие прыжки.',
-      price: 11000000, priceOre: 1000,
+      price: 1800000, priceOre: 1000,
       mass: 11, power: 17000, fuel: 210, burn: 2.7, topSpeed: 450, react: 1.00, airCtrl: 1.15,
       drive: 'all', lift: 0.38,
       wheel: { r: 30, mass: 2.0, grip: 1.45 },
@@ -100,7 +100,7 @@ window.HC = window.HC || {};
     hills: {
       name: 'Холмы', order: 0, unlock: null,
       about: 'Мягкие волны и трамплины. Место, где учатся.',
-      amp: 200, len: 620, rough: 0.64, gravity: 1350,
+      amp: 150, len: 760, rough: 0.42, gravity: 1350,
       grip: 1.00, roll: 1.00,
       coinRate: 1.00, oreRate: 0.10, payout: 1.00,
       far: ['pine', 'tree'],
@@ -203,20 +203,21 @@ window.HC = window.HC || {};
      effect  — прибавка за уровень
   */
   HC.UPGRADES = {
-    engine:  { name: 'Двигатель',  max: 15, base: 14500, mult: 1.46, ore: 0,    oreFrom: 8,  oreBase: 9,
+    engine:  { name: 'Двигатель',  max: 15, base: 6000, mult: 1.46, ore: 0,    oreFrom: 8,  oreBase: 9,
                about: 'Тяга и предел скорости. На максимуме машина вдвое сильнее и вдвое быстрее.' },
-    tires:   { name: 'Шины',       max: 15, base: 12500, mult: 1.44, ore: 0,    oreFrom: 8,  oreBase: 8,
+    tires:   { name: 'Шины',       max: 15, base: 5500, mult: 1.44, ore: 0,    oreFrom: 8,  oreBase: 8,
                about: 'Сцепление с землёй. На максимуме держит вдвое лучше.' },
-    susp:    { name: 'Подвеска',   max: 15, base: 16000, mult: 1.45, ore: 0,    oreFrom: 8,  oreBase: 9,
+    susp:    { name: 'Подвеска',   max: 15, base: 7000, mult: 1.45, ore: 0,    oreFrom: 8,  oreBase: 9,
                about: 'Мягче приземления, реже кувырки. На максимуме вдвое спокойнее.' },
-    fuel:    { name: 'Бак',        max: 15, base: 13500, mult: 1.42, ore: 0,    oreFrom: 9,  oreBase: 8,
+    fuel:    { name: 'Бак',        max: 15, base: 6000, mult: 1.42, ore: 0,    oreFrom: 9,  oreBase: 8,
                about: 'Дольше едешь — дальше уезжаешь. На максимуме бак вдвое больше.' }
   };
 
   /* Во что превращается уровень прокачки.
      Правило простое: на максимуме ровно вдвое больше, чем на нуле. */
+  // Первые покупки заметнее; дальше прибавка плавно уменьшается до ×2.
   function twice(key) {
-    return function (l) { return 1 + l / HC.UPGRADES[key].max; };
+    return function (l) { return 1 + Math.sqrt(l / HC.UPGRADES[key].max); };
   }
   HC.upgradeEffect = {
     engine: twice('engine'),   // тяга и предел скорости
@@ -233,10 +234,10 @@ window.HC = window.HC || {};
   HC.BUILDINGS = {
     mine: {
       name: 'Шахта', icon: 'mine', limit: 6, max: 12,
-      cost: 16500, costMult: 1.68, ore: 0, oreMult: 1.5, oreFrom: 6, oreBase: 12,
+      cost: 8400, costMult: 1.68, ore: 0, oreMult: 1.5, oreFrom: 6, oreBase: 12,
       about: 'Тихо стучит внутри холма и приносит монеты.',
       rate: 5.4, rateMult: 1.40, res: 'coins',
-      build: 450, buildMult: 1.62
+      build: 100, buildMult: 1.62
     },
     drill: {
       name: 'Бур', icon: 'drill', limit: 3, max: 12,
@@ -328,8 +329,11 @@ window.HC = window.HC || {};
     coinPer100: 0.2,       // и ещё столько же за каждые пройденные 100 м
     coinPer100Max: 25,     // но не бесконечно: дальше монетка не дорожает
     orePickup: 1,          // руды за один камень
-    fuelPickup: 0.16,      // доля бака за канистру
-    coinEvery: 100,        // монетки лежат примерно через столько метров
+    fuelPickup: 0.35,      // доля бака за канистру
+    fuelBurn: 0.75,        // полный стоковый бак джипа: около 53 с газа
+    fuelEvery: 240,        // первая канистра на 120 м, дальше каждые 240 м
+    medalCoins: 50,        // разовая награда: бронза ×1, серебро ×2, золото ×3
+    coinEvery: 28,         // небольшие цепочки монет задают ритм движения
     distancePer100: 0.3,   // монет за каждые 100 м
     recordBonus: 0.35,     // доля сверху за новый рекорд
     flipCoins: 7,          // за первое сальто в прыжке; второе дороже вдвое и т.д.
@@ -356,7 +360,7 @@ window.HC = window.HC || {};
     },
     normal: {
       name: 'Средняя', order: 1,
-      about: 'Ровный темп: первая шахта за десяток заездов, стройка в минутах. Так игра задумана.',
+      about: 'Первые улучшения за несколько заездов, первая шахта строится за полминуты. Спокойный темп с заметным прогрессом.',
       gain: 8, cost: 0.25, build: 0.30
     },
     hard: {

@@ -82,7 +82,7 @@ window.HC = window.HC || {};
       HC.Quests.ensure(this.state);
 
       // что накопилось, пока игра была закрыта
-      var off = HC.Economy.applyOffline(this.state);
+      HC.Economy.applyOffline(this.state);
       HC.UI.refreshTop();
       HC.UI.refreshPending();
 
@@ -101,11 +101,14 @@ window.HC = window.HC || {};
       this.onUnload = function () { HC.save(self.state, true); };
       window.addEventListener('beforeunload', this.onUnload);
       document.addEventListener('visibilitychange', function () {
-        if (document.hidden) { HC.save(self.state, true); HC.Audio.suspend(); }
+        if (document.hidden) {
+          self.clearInput();
+          if (self.scene === 'ride' && HC.Ride.phase === 'run' && !HC.Ride.paused) self.togglePause();
+          HC.save(self.state, true); HC.Audio.suspend();
+        }
         else HC.Audio.resume();
       });
 
-      this.pendingOffline = (Math.floor(this.state.base.pending.coins) >= 1 && off.seconds > 120) ? off : null;
     },
 
     /* --- Тема и размеры ----------------------------------- */
@@ -139,9 +142,14 @@ window.HC = window.HC || {};
 
       function keyFlag(e, down) {
         var k = e.key;
+        if (self.scene !== 'ride') return;
+        if (e.target && e.target.tagName === 'BUTTON' && k === ' ' &&
+            e.target.id !== 'pedal-gas' && e.target.id !== 'pedal-brake') return;
+        if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
         if (k === 'ArrowRight' || k === 'd' || k === 'D' || k === 'в' || k === 'В' || k === ' ') { self.keys.gas = down; e.preventDefault(); }
         if (k === 'ArrowLeft' || k === 'a' || k === 'A' || k === 'ф' || k === 'Ф') { self.keys.brake = down; e.preventDefault(); }
-        if (down && k === 'Escape') self.togglePause();
+        if (down && (k === 'r' || k === 'R' || k === 'к' || k === 'К')) HC.Ride.recover();
+        if (down && !e.repeat && k === 'Escape') self.togglePause();
       }
       // первое касание/нажатие где угодно — браузеру этого хватает, чтобы разрешить звук
       var unlockOnce = function () {
@@ -154,11 +162,24 @@ window.HC = window.HC || {};
 
       window.addEventListener('keydown', function (e) { keyFlag(e, true); });
       window.addEventListener('keyup', function (e) { keyFlag(e, false); });
-      window.addEventListener('blur', function () { self.keys.gas = self.keys.brake = false; });
+      window.addEventListener('blur', function () {
+        self.clearInput();
+        if (self.scene === 'ride' && HC.Ride.phase === 'run' && !HC.Ride.paused) self.togglePause();
+      });
+
+      document.getElementById('btn-ride-sound').addEventListener('click', function () {
+        self.state.settings.music = !self.state.settings.music;
+        HC.Audio.unlock(); HC.Audio.applySettings(self.state.settings);
+        HC.UI.syncSound(); HC.save(self.state, true);
+      });
 
       ['brake', 'gas'].forEach(function (which) {
         var node = document.getElementById(which === 'gas' ? 'pedal-gas' : 'pedal-brake');
-        var set = function (v) { return function (e) { self.touch[which] = v; e.preventDefault(); }; };
+        var set = function (v) { return function (e) {
+          self.touch[which] = v;
+          if (v && e.pointerId !== undefined) node.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        }; };
         node.addEventListener('pointerdown', set(true));
         node.addEventListener('pointerup', set(false));
         node.addEventListener('pointercancel', set(false));
@@ -178,6 +199,8 @@ window.HC = window.HC || {};
         });
       });
 
+      document.getElementById('btn-recover').addEventListener('click', function () { HC.Ride.recover(); });
+      document.getElementById('btn-rescue-finish').addEventListener('click', function () { HC.Ride.giveUp(); });
       document.getElementById('btn-pause').addEventListener('click', function () { self.togglePause(); });
       document.getElementById('btn-play').addEventListener('click', function () { self.startFromTitle(); });
       document.getElementById('btn-title-settings').addEventListener('click', function () {
@@ -256,6 +279,11 @@ window.HC = window.HC || {};
       });
     },
 
+    clearInput: function () {
+      this.keys.gas = this.keys.brake = this.touch.gas = this.touch.brake = false;
+      this.input.throttle = 0;
+    },
+
     readInput: function () {
       var gas = this.keys.gas || this.touch.gas;
       var brake = this.keys.brake || this.touch.brake;
@@ -308,13 +336,9 @@ window.HC = window.HC || {};
         document.getElementById('title').hidden = true;
         HC.Ride.stop();
         self.goBase();
-        var fresh = self.state.stats.runs === 0 && !self.state.base.plots.some(Boolean);
-        if (fresh && !self.state.settings.diffPicked) {
-          // первый запуск: сначала спрашиваем, с какой руки играть
-          HC.UI.openDifficulty(function () { self.showWelcome(); });
-        }
-        else if (fresh) self.showWelcome();
-        else if (self.pendingOffline) { HC.UI.showOffline(self.pendingOffline); self.pendingOffline = null; }
+        self.state.settings.diffPicked = true;
+        HC.save(self.state, true);
+        self.beginRide(HC.trackOpen(self.state, self.state.track) ? self.state.track : 'hills');
       });
     },
 
@@ -339,6 +363,9 @@ window.HC = window.HC || {};
     },
 
     beginRide: function (trackId) {
+      this.clearInput();
+      this._d = this._c = null;
+      document.getElementById('ride-rescue').hidden = true;
       this.lastTrack = trackId;
       this.state.track = trackId;
       this.scene = 'ride';
@@ -361,8 +388,9 @@ window.HC = window.HC || {};
     },
 
     togglePause: function () {
-      if (this.scene !== 'ride' || !HC.Ride.active) return;
+      if (this.scene !== 'ride' || !HC.Ride.active || HC.Ride.phase === 'rescue') return;
       if (HC.Ride.paused) { HC.Ride.paused = false; HC.UI.close(); return; }
+      this.clearInput();
       HC.Ride.paused = true;
       var self = this;
       HC.UI.onClose = function () { HC.Ride.paused = false; };
@@ -380,29 +408,6 @@ window.HC = window.HC || {};
               HC.UI.onClose = null;
               HC.UI.close();
               HC.Ride.giveUp();
-            });
-          }
-        };
-      });
-    },
-
-    showWelcome: function () {
-      HC.UI.open(function () {
-        return {
-          title: 'Тихие холмы', html:
-            '<p class="lead">Здесь некуда спешить. Катаешься по холмам, собираешь монеты, ' +
-            'строишь в долине шахты — и они работают, пока тебя нет.</p>' +
-            '<div class="stat"><span>газ</span><b>→ или пробел</b></div>' +
-            '<div class="stat"><span>тормоз и назад</span><b>←</b></div>' +
-            '<div class="stat"><span>на телефоне</span><b>две педали снизу</b></div>' +
-            '<p class="muted">В воздухе газ задирает нос, тормоз опускает. Голова водителя ' +
-            'не должна коснуться земли — вот и всё, что нужно знать.</p>' +
-            '<div class="row"><button class="btn main wide" data-go>Поехали</button></div>',
-          bind: function (root) {
-            root.querySelector('[data-go]').addEventListener('click', function () {
-              HC.Audio.unlock();
-              HC.UI.close();
-              HC.UI.openTracks();
             });
           }
         };
@@ -491,6 +496,23 @@ window.HC = window.HC || {};
       var d = Math.floor(car.distance);
       if (d !== this._d) { document.getElementById('dist').textContent = d + ' м'; this._d = d; }
       if (r.coins !== this._c) { document.getElementById('run-coins').textContent = HC.fmt(r.coins); this._c = r.coins; }
+      document.getElementById('fuel-info').textContent = Math.ceil(pct) + '% · канистра через ' +
+        Math.max(0, Math.ceil((r.terrain.nextFuelX(car.pos.x) - car.pos.x) / HC.PPM)) + ' м';
+      var goal = r.goal;
+      document.getElementById('ride-goal-label').textContent = goal.label + ' · ' + goal.distance + ' м';
+      document.getElementById('ride-goal-left').textContent = 'ещё ' + Math.max(0, Math.ceil(goal.distance - car.distance)) + ' м';
+      document.getElementById('ride-goal-bar').style.width = Math.min(100, car.distance / goal.distance * 100) + '%';
+      var hint = document.getElementById('ride-hint');
+      hint.hidden = !this.state.settings.showHints || r.phase !== 'run';
+      hint.textContent = pct < 20 ? 'Топливо на исходе — следующая канистра впереди' :
+        r.stuckT > 2 ? 'Попробуй сдать назад и взять разгон' :
+        !car.onGround && car.airTime > 0.3 ? 'В воздухе: газ — нос вверх, тормоз — нос вниз' :
+        d < 120 ? (window.matchMedia('(pointer: coarse)').matches
+          ? 'Правая педаль — газ, левая — тормоз. Перед крутым спуском отпусти газ.'
+          : 'Газ → / D · тормоз ← / A · отпусти газ перед крутым спуском') : '';
+      if (!hint.textContent) hint.hidden = true;
+      document.getElementById('pedal-gas').classList.toggle('pressed', this.keys.gas || this.touch.gas);
+      document.getElementById('pedal-brake').classList.toggle('pressed', this.keys.brake || this.touch.brake);
     }
   };
 
