@@ -152,6 +152,77 @@ test('First upgrades are perceptible while every upgrade still caps at ×2', () 
   }
 });
 
+test('Boost increases acceleration without permanently changing vehicle stats', () => {
+  function drive(boost) {
+    const r = start();
+    r.terrain = new H.Terrain(H.TRACKS.hills, 54321, 'hills');
+    r.car = new H.Vehicle('jeep', {}, r.terrain, H.TRACKS.hills.gravity);
+    const power = r.car.power, topSpeed = r.car.topSpeed;
+    for (let i = 0; i < 60; i++) r.update(1 / 60, { throttle: 1, boost });
+    assert.equal(r.car.power, power);
+    assert.equal(r.car.topSpeed, topSpeed);
+    assert.ok(r.boost >= 0 && r.boost <= 1);
+    return r.car.vel.x;
+  }
+  const normal = drive(false), boosted = drive(true);
+  assert.ok(boosted > normal * 1.1, `${boosted} vs ${normal}`);
+});
+
+test('Boost is unavailable in the air, while braking, with no fuel or during a pause', () => {
+  const r = start();
+  r.car.onGround = true; r.car.speed = 0;
+  r.updateBoost(1, true, 1);
+  assert.ok(Math.abs(r.boost - 0.58) < 1e-8);
+  r.car.onGround = false;
+  const charge = r.boost;
+  r.updateBoost(1, true, 1); assert.equal(r.boost, charge);
+  r.car.onGround = true;
+  r.updateBoost(1, true, -1); assert.equal(r.boost, charge);
+  r.car.fuel = 0;
+  r.updateBoost(1, true, 1); assert.equal(r.boost, charge);
+  r.paused = true;
+  r.update(1 / 60, { throttle: 1, boost: true }); assert.equal(r.boost, charge);
+  r.paused = false; r.phase = 'ending';
+  r.updateBoost(1, true, 1); assert.equal(r.boost, charge);
+});
+
+test('An empty boost must be released before it can fire again', () => {
+  const r = start(); r.car.onGround = true; r.car.speed = 100; r.boost = 0.1;
+  r.updateBoost(1, true, 1);
+  assert.equal(r.boost, 0); assert.equal(r.boostLocked, true);
+  r.updateBoost(1, true, 1);
+  assert.equal(r.boosting, false); assert.ok(r.boost > 0);
+  r.updateBoost(1, false, 1); r.updateBoost(1 / 60, true, 1);
+  assert.equal(r.boosting, true);
+});
+
+test('Only substantial aligned landings reward coins and charge; crashes break the series', () => {
+  const r = start();
+  r.boost = 0.3; r.car.ang = 0; r.car.angVel = 0;
+  r.landing(0.2); assert.equal(r.cleanLandings, 0);
+  r.landing(0.6);
+  assert.equal(r.cleanLandings, 1); assert.ok(Math.abs(r.boost - 0.48) < 1e-8);
+  const first = r.coins;
+  r.landing(0.6); assert.equal(r.coins - first, first * 2);
+  r.car.crashed = true; const earned = r.coins;
+  r.landing(0.6); assert.equal(r.landingStreak, 0); assert.equal(r.coins, earned);
+});
+
+test('Route missions count picked items, pay once, and do not pay in demo or after a crash', () => {
+  const r = start();
+  assert.equal(r.mission.key, 'coinPickups');
+  r.coins = 5000; r.checkMission(); assert.equal(r.mission.done, false);
+  r.coinPickups = 15; r.checkMission();
+  assert.equal(r.mission.done, true); assert.equal(r.ore, 1);
+  const earned = r.coins; r.checkMission(); assert.equal(r.coins, earned);
+  const state = H.defaultState(); state.stats.runs = 1;
+  const cans = start('hills', state); cans.cans = 2; cans.demo = true;
+  cans.checkMission(); assert.equal(cans.ore, 0);
+  cans.demo = false; cans.car.crashed = true;
+  cans.checkMission(); assert.equal(cans.ore, 0);
+  cans.car.crashed = false; cans.checkMission(); assert.equal(cans.ore, 2);
+});
+
 test('Stock vehicles remain finite on all five tracks', () => {
   for (const track of Object.keys(H.TRACKS)) {
     for (const vehicle of Object.keys(H.VEHICLES)) {
@@ -159,7 +230,7 @@ test('Stock vehicles remain finite on all five tracks', () => {
       const r = start(track, state);
       for (let i = 0; i < 600 && r.active; i++) {
         if (r.phase === 'rescue') r.recover();
-        r.update(1 / 60, { throttle: 1 });
+        r.update(1 / 60, { throttle: 1, boost: true });
         assert.ok(Number.isFinite(r.car.pos.x + r.car.pos.y + r.car.ang));
         assert.ok(r.car.fuel >= 0 && r.car.fuel <= r.car.maxFuel);
       }

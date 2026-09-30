@@ -555,6 +555,9 @@ window.HC = window.HC || {};
           (r.bonus ? '<div class="stat"><span>' + ic('trophy', 'sm') + 'бонус за рекорд</span><b>' + money(r.bonus) + '</b></div>' : '') +
           (r.medalBonus ? '<div class="stat"><span>' + ic('medal', 'sm') + 'за новые медали</span><b>' + money(r.medalBonus) + '</b></div>' : '') +
           (r.flips ? '<div class="stat"><span>' + ic('flip', 'sm') + 'сальто</span><b>' + r.flips + '</b></div>' : '') +
+          (r.cleanLandings ? '<div class="stat"><span>мягкие посадки</span><b>' + r.cleanLandings +
+            (r.bestStreak > 1 ? ' · серия ' + r.bestStreak : '') + '</b></div>' : '') +
+          (r.mission ? '<div class="mission-result">' + ic('check', 'sm') + r.mission + ' — выполнено</div>' : '') +
           (r.cans ? '<div class="stat"><span>' + ic('fuel', 'sm') + 'канистр подобрано</span><b>' + r.cans + '</b></div>' : '') +
           (r.ore ? '<div class="stat"><span>' + ic('ore', 'sm') + 'руда</span><b>' + money(r.ore) + '</b></div>' : '') +
           '<div class="stat total"><span>' + ic('coin') + 'всего монет</span><b>' + money(r.total) + '</b></div>' +

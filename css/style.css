@@ -709,3 +709,31 @@ body.theme-color #fuel-wrap.low i { background: #c36442; }
   .fuel-info { max-width: 105px; }
   #dist { font-size: 16px; padding: 6px 10px; }
 }
+
+.hud-zone.center { flex-direction: column; gap: 1px; }
+#ride-speed { font-size: 10px; font-variant-numeric: tabular-nums; }
+#ride-mission { margin: 9px 0 0; border-top: 1px solid var(--line); padding-top: 7px; font-size: 11px; color: var(--ink-soft); }
+#ride-mission.complete { color: var(--ink); font-weight: 650; }
+.boost-pedal {
+  pointer-events: auto; align-self: center; width: 98px; height: 76px;
+  display: grid; grid-template-columns: 22px auto; gap: 2px 5px; align-content: center;
+  padding: 9px 12px; border: 1px solid var(--ink); border-radius: 20px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent); color: var(--ink);
+  box-shadow: var(--lift-2); cursor: pointer; touch-action: none;
+  font: inherit; transition: background .15s, transform .15s;
+}
+.boost-pedal .i { width: 21px; height: 21px; grid-row: span 2; align-self: center; }
+.boost-pedal b { font-size: 11px; }
+#boost-charge { font-size: 10px; }
+.boost-track { grid-column: 1 / -1; height: 4px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 15%, transparent); overflow: hidden; margin-top: 4px; }
+#boost-bar { display: block; height: 100%; background: currentColor; border-radius: inherit; }
+.boost-pedal.pressed { background: var(--ink); color: var(--panel); transform: scale(.96); }
+.boost-pedal.empty { opacity: .6; }
+.mission-result { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; margin: 10px 0; font-size: 13px; }
+@media (max-width: 520px) { #ride-goal { width: min(320px, calc(100vw - 32px)); } }
+@media (max-height: 500px) {
+  #ride-goal { top: calc(74px + env(safe-area-inset-top)); width: min(380px, calc(100vw - 240px)); }
+  #ride-mission { margin-top: 5px; padding-top: 4px; }
+  .boost-pedal { height: 62px; }
+  #ride-hint { bottom: calc(100px + env(safe-area-inset-bottom)); }
+}

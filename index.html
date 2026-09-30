@@ -138,7 +138,7 @@
       <span id="fuel-info" class="fuel-info">100% · канистра через 120 м</span>
     </div>
     <div class="hud-zone center">
-      <span id="dist">0 м</span>
+      <span id="dist">0 м</span><span id="ride-speed">0 км/ч</span>
     </div>
     <div class="hud-zone right">
       <span class="run-coins"><svg class="i"><use href="#i-coin"/></svg><span id="run-coins">0</span></span>
@@ -149,6 +149,7 @@
   <div id="ride-goal">
     <div><b id="ride-goal-label">Бронза · 300 м</b><span id="ride-goal-left">ещё 300 м</span></div>
     <div class="bar"><i id="ride-goal-bar"></i></div>
+    <p id="ride-mission"></p>
   </div>
   <p id="ride-hint" hidden></p>
   <div id="ride-rescue" role="dialog" aria-modal="true" aria-labelledby="rescue-title" hidden>
@@ -162,6 +163,10 @@
   </div>
   <div id="pedals">
     <button id="pedal-brake" class="pedal back" aria-label="Тормоз" title="Тормоз"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg><span aria-hidden="true">Тормоз</span></button>
+    <button id="pedal-boost" class="boost-pedal" aria-label="Разгон" title="Разгон: Shift вместе с газом">
+      <svg class="i" aria-hidden="true"><use href="#i-engine"/></svg>
+      <b>Разгон</b><span id="boost-charge">100%</span><span class="boost-track"><i id="boost-bar"></i></span>
+    </button>
     <button id="pedal-gas" class="pedal" aria-label="Газ" title="Газ"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg><span aria-hidden="true">Газ</span></button>
   </div>
 </div>

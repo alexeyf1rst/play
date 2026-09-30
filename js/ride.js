@@ -30,6 +30,22 @@ window.HC = window.HC || {};
       this.cans = 0;
       this.airTotal = 0;
       this.airBonus = 0;
+      this._lastAir = 0;
+      this.coinPickups = 0;
+      this.cleanLandings = 0;
+      this.landingStreak = 0;
+      this.bestStreak = 0;
+      this.boost = 1;
+      this.boosting = false;
+      this.boostLocked = false;
+      this.boostStrength = 0;
+      var missions = [
+        { title: 'Собери 15 монет', key: 'coinPickups', target: 15, ore: 1 },
+        { title: 'Подбери 2 канистры', key: 'cans', target: 2, ore: 2 },
+        { title: 'Сделай 3 мягкие посадки', key: 'cleanLandings', target: 3, ore: 3 }
+      ];
+      this.mission = missions[st.stats.runs % missions.length];
+      this.mission.done = false;
       this.time = 0;
       this.phase = 'run';
       this.endTimer = 0;
@@ -66,6 +82,9 @@ window.HC = window.HC || {};
     },
 
     offerRecovery: function () {
+      this.boosting = false;
+      this.boostStrength = 0;
+      this.landingStreak = 0;
       this.phase = 'rescue';
       HC.Audio.engineStop();
       this.game.clearInput();
@@ -85,6 +104,8 @@ window.HC = window.HC || {};
       car.startX = startX;
       this.prevX = car.pos.x;
       this.stuckT = 0;
+      this._lastAir = 0;
+      this.airFlips = 0;
       this.shake = 0;
       this.recoveryUsed = true;
       this.phase = 'run';
@@ -92,6 +113,53 @@ window.HC = window.HC || {};
       document.getElementById('ride-rescue').hidden = true;
       document.getElementById('btn-recover').blur();
       HC.Audio.engineStart();
+    },
+
+    updateBoost: function (dt, requested, throttle) {
+      var car = this.car;
+      if (!requested) this.boostLocked = false;
+      this.boosting = dt > 0 && !this.boostLocked && !this.demo && this.phase === 'run' && !car.crashed &&
+        car.onGround && car.fuel > 0 && throttle > 0 && requested && this.boost > 0;
+      if (this.boosting) {
+        var use = Math.min(this.boost, HC.ECON.boostDrain * dt);
+        this.boostStrength = use / (HC.ECON.boostDrain * dt);
+        this.boost = Math.max(0, this.boost - use);
+        if (this.boost <= 0) this.boostLocked = true;
+      } else {
+        this.boostStrength = 0;
+        if (this.phase === 'run' && car.onGround && !car.crashed && car.speed > 40) {
+          this.boost = Math.min(1, this.boost + HC.ECON.boostRecharge * dt);
+        }
+      }
+    },
+
+    landing: function (airTime) {
+      if (this.demo || this.phase !== 'run' || airTime < 0.45) return;
+      var car = this.car;
+      var slope = Math.atan(this.terrain.slope(car.pos.x));
+      var angle = Math.atan2(Math.sin(car.ang - slope), Math.cos(car.ang - slope));
+      if (car.crashed || Math.abs(angle) > 0.3 || Math.abs(car.angVel) > 2.2) {
+        this.landingStreak = 0;
+        return;
+      }
+      this.cleanLandings++;
+      this.landingStreak++;
+      this.bestStreak = Math.max(this.bestStreak, this.landingStreak);
+      this.boost = Math.min(1, this.boost + 0.18);
+      var multiplier = Math.min(3, this.landingStreak);
+      this.addCoins(Math.round(HC.coins(HC.ECON.cleanLandingCoins * multiplier)),
+        car.pos.x, car.pos.y - 80, 'МЯГКАЯ ПОСАДКА' + (multiplier > 1 ? ' ×' + multiplier : ''));
+      HC.Audio.land(0.15);
+    },
+
+    checkMission: function () {
+      var m = this.mission;
+      if (this.demo || this.phase !== 'run' || this.car.crashed || m.done || this[m.key] < m.target) return;
+      m.done = true;
+      this.ore += m.ore;
+      this.addCoins(Math.round(HC.coins(HC.ECON.missionCoins)), this.car.pos.x, this.car.pos.y - 112, 'ЦЕЛЬ ВЫПОЛНЕНА');
+      this.floats.push({ x: this.car.pos.x, y: this.car.pos.y - 80, t: 0, text: '+' + m.ore + ' руды' });
+      HC.Audio.build();
     },
 
     /* --- Логика ------------------------------------------- */
@@ -115,7 +183,14 @@ window.HC = window.HC || {};
         car.fuel = car.maxFuel;
       }
       var thr = this.phase === 'run' ? input.throttle : 0;
+      this.updateBoost(dt, !!input.boost, thr);
+      var power = car.power, topSpeed = car.topSpeed;
+      car.power = power * (1 + 0.4 * this.boostStrength);
+      car.topSpeed = topSpeed * (1 + 0.25 * this.boostStrength);
       car.update(dt, { throttle: thr });
+      car.power = power;
+      car.topSpeed = topSpeed;
+      if (wasAir && car.onGround) this.landing(this._lastAir);
       if (this.time >= this.safeCheck && !car.crashed && car.onGround && Math.abs(car.ang) < 0.3) {
         this.safeCheck = this.time + 0.2;
         var safe = true;
@@ -215,6 +290,7 @@ window.HC = window.HC || {};
       if (T.hasLogs) this.fallen(dt);
       this.hitTrees();
       this.collect();
+      this.checkMission();
       this.dust(dt);
       this.updateFx(dt);
 
@@ -260,6 +336,7 @@ window.HC = window.HC || {};
     camFollow: function (dt) {
       var car = this.car;
       var lead = clamp(car.vel.x * 0.26, -90, 150);
+      if (this.portrait) lead += this.viewW * 0.1 / this.cam.z;
       var k = 1 - Math.pow(0.0025, dt);
       this.cam.x = lerp(this.cam.x, car.pos.x + lead, k);
       var drop = (this.viewH || 600) * 0.10 / this.cam.z;   // машина чуть ниже центра экрана
@@ -287,6 +364,8 @@ window.HC = window.HC || {};
     beginEnd: function (reason) {
       if (this.phase !== 'run') return;
       this.phase = 'ending';
+      this.boosting = false;
+      this.boostStrength = 0;
       this.endTimer = 0;
       this.reason = reason;
       if (this.car.crashed) HC.Audio.crash();
@@ -344,6 +423,9 @@ window.HC = window.HC || {};
         bonus: bonus,
         total: total,
         medalBonus: medalBonus,
+        cleanLandings: this.cleanLandings,
+        bestStreak: this.bestStreak,
+        mission: this.mission.done ? this.mission.title : null,
         ore: this.ore,
         flips: this.flips,
         cans: this.cans,
@@ -477,6 +559,7 @@ window.HC = window.HC || {};
         if (d < reach) {
           this.terrain.take(it);
           if (it.type === 'coin') {
+            this.coinPickups++;
             // чем дальше уехал, тем дороже монетка — но не до бесконечности
             var steps = Math.min(Math.floor(car.distance / 100), HC.ECON.coinPer100Max);
             // округляем до десятых: иначе в подписи вылезает 1.6000000000000001
@@ -540,7 +623,9 @@ window.HC = window.HC || {};
       var T = this.terrain, cam = this.cam;
       P = T.tint(P);              // у каждой трассы свои цвета
       this.viewH = H;
-      cam.z = clamp(Math.min(W / 700, H / 760) * (this.zoomK || 1), 0.44, 1.35);
+      this.viewW = W;
+      this.portrait = W < H && W <= 520;
+      cam.z = clamp(Math.min(W / (this.portrait ? 560 : 700), H / 760) * (this.zoomK || 1), 0.44, 1.35);
 
       // Тряска — в экранных координатах, на физику не влияет. Кадр при этом
       // чуть раздвигаем, иначе по краям вылезала бы пустота.
