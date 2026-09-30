@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Тихие холмы</title>
 <meta name="description" content="Браузерная игра на двоих жанров: холмы с настоящей физикой подвески и долина с шахтами, которые работают, пока тебя нет. Без установки, с телефона и с компьютера.">
-<meta name="theme-color" content="#5cb7e8">
+<meta name="theme-color" content="#37b9fa">
 <link rel="canonical" href="https://play-orpin-eight.vercel.app/">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%235cb7e8'/%3E%3Ccircle cx='24.5' cy='8' r='4.2' fill='%23fff2a8'/%3E%3Cpath d='M0 21 Q8 15 16 19 T32 17 L32 32 L0 32 Z' fill='%23b57c44'/%3E%3Cpath d='M0 21 Q8 15 16 19 T32 17' stroke='%2359b247' stroke-width='4.5' fill='none'/%3E%3Crect x='10' y='13.5' width='10' height='4.5' rx='1.4' fill='%23e04a3b'/%3E%3Ccircle cx='12.5' cy='18.5' r='2.4' fill='%232a2018'/%3E%3Ccircle cx='18' cy='18.5' r='2.4' fill='%232a2018'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2337b9fa'/%3E%3Ccircle cx='24.5' cy='8' r='4.2' fill='%23fff2a8'/%3E%3Cpath d='M0 21 Q8 15 16 19 T32 17 L32 32 L0 32 Z' fill='%23b57c44'/%3E%3Cpath d='M0 21 Q8 15 16 19 T32 17' stroke='%2360c932' stroke-width='4.5' fill='none'/%3E%3Crect x='10' y='13.5' width='10' height='4.5' rx='1.4' fill='%23f44735'/%3E%3Ccircle cx='12.5' cy='18.5' r='2.4' fill='%232a2018'/%3E%3Ccircle cx='18' cy='18.5' r='2.4' fill='%232a2018'/%3E%3C/svg%3E">
 
 <!-- превью ссылки: в мессенджерах и соцсетях вместо голого текста
      показывается заставка игры. Адрес указан целиком — если поменяется
@@ -33,6 +33,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/versions.css">
 </head>
 <body class="theme-color">
 
@@ -92,10 +93,11 @@
 <div id="title">
   <div class="title-top">
     <h1>Тихие холмы</h1>
-    <p class="tagline">холмы · монеты · шахты в долине</p>
+    <p class="tagline">строй деревню · покоряй холмы</p>
   </div>
   <div class="title-bottom">
     <button id="btn-play" class="btn main go"><svg class="i"><use href="#i-play"/></svg>Играть</button>
+    <button id="btn-village" class="btn title-village"><svg class="i"><use href="#i-mine"/></svg>Моя деревня</button>
     <p id="title-stats" class="title-stats" hidden></p>
     <div class="title-row">
       <button id="btn-title-sound" class="icon-btn" title="Музыка" aria-label="Музыка"><svg class="i"><use href="#i-sound"/></svg></button>
@@ -135,19 +137,39 @@
   <div id="ride-top">
     <div class="hud-zone left">
       <div id="fuel-wrap"><i id="fuel-bar"></i></div>
-      <span class="hud-cap">топливо</span>
+      <span id="fuel-info" class="fuel-info">100% · канистра через 120 м</span>
     </div>
     <div class="hud-zone center">
-      <span id="dist">0 м</span>
+      <span id="dist">0 м</span><span id="ride-speed">0 км/ч</span>
     </div>
     <div class="hud-zone right">
       <span class="run-coins"><svg class="i"><use href="#i-coin"/></svg><span id="run-coins">0</span></span>
+      <button id="btn-ride-sound" class="icon-btn" title="Включить музыку" aria-label="Включить музыку" aria-pressed="false">♪̸</button>
       <button id="btn-pause" class="icon-btn" title="Пауза" aria-label="Пауза"><svg class="i"><use href="#i-pause"/></svg></button>
     </div>
   </div>
+  <div id="ride-goal">
+    <div><b id="ride-goal-label">Бронза · 300 м</b><span id="ride-goal-left">ещё 300 м</span></div>
+    <div class="bar"><i id="ride-goal-bar"></i></div>
+    <p id="ride-mission"></p>
+  </div>
+  <p id="ride-hint" hidden></p>
+  <div id="ride-rescue" role="dialog" aria-modal="true" aria-labelledby="rescue-title" hidden>
+    <div class="rescue-card">
+      <span class="rescue-kicker">Одна помощь за заезд</span>
+      <h2 id="rescue-title">Дорога ещё впереди</h2>
+      <p id="rescue-reason"></p>
+      <button id="btn-recover" class="btn main wide">Вернуть на колёса · R</button>
+      <button id="btn-rescue-finish" class="btn wide">Забрать награду и закончить</button>
+    </div>
+  </div>
   <div id="pedals">
-    <button id="pedal-brake" class="pedal back" aria-label="Тормоз"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg></button>
-    <button id="pedal-gas" class="pedal" aria-label="Газ"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg></button>
+    <button id="pedal-brake" class="pedal back" aria-label="Тормоз" title="Тормоз"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg><span aria-hidden="true">Тормоз</span></button>
+    <button id="pedal-boost" class="boost-pedal" aria-label="Разгон" title="Разгон: Shift вместе с газом">
+      <svg class="i" aria-hidden="true"><use href="#i-engine"/></svg>
+      <b>Разгон</b><span id="boost-charge">100%</span><span class="boost-track"><i id="boost-bar"></i></span>
+    </button>
+    <button id="pedal-gas" class="pedal" aria-label="Газ" title="Газ"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg><span aria-hidden="true">Газ</span></button>
   </div>
 </div>
 
@@ -169,7 +191,9 @@
 <script src="js/vehicle.js"></script>
 <script src="js/ride.js"></script>
 <script src="js/base.js"></script>
+<script src="js/art.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
+<script src="js/versions.js" data-version="current"></script>
 </body>
 </html>

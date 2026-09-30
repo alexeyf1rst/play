@@ -100,11 +100,14 @@ window.HC = window.HC || {};
 
     syncSound: function () {
       var on = G.state.settings.music;
-      ['btn-sound', 'btn-title-sound'].forEach(function (id) {
+      ['btn-sound', 'btn-title-sound', 'btn-ride-sound'].forEach(function (id) {
         var b = $(id);
         if (!b) return;
         b.textContent = on ? '♪' : '♪̸';
         b.classList.toggle('off', !on);
+        b.setAttribute('aria-pressed', String(on));
+        b.setAttribute('aria-label', on ? 'Выключить музыку' : 'Включить музыку');
+        b.title = on ? 'Выключить музыку' : 'Включить музыку';
       });
     },
 
@@ -251,12 +254,12 @@ window.HC = window.HC || {};
         });
         // Характеристики машины: они у неё свои и не настраиваются.
         var tank = Math.round(v.fuel * HC.upgradeEffect.fuel(s.up[vid].fuel | 0) *
-                              HC.Economy.garageFuel(s) / (v.burn * HC.Economy.garageBurn(s)));
+                              HC.Economy.garageFuel(s) / (v.burn * HC.Economy.garageBurn(s) * HC.ECON.fuelBurn));
         html += '<h4 class="sec">' + ic('chart') + 'Какая она</h4>' +
           '<div class="stat"><span>' + ic('drive', 'sm') + 'привод</span><b>' +
           (HC.DRIVE[v.drive] || HC.DRIVE.all).name.toLowerCase() + '</b></div>' +
           '<div class="stat"><span>' + ic('engine', 'sm') + 'предел скорости</span><b>' +
-          Math.round(v.topSpeed * (1 + (s.up[vid].engine | 0) * 0.018) / HC.PPM * 3.6) + ' км/ч</b></div>' +
+          Math.round(v.topSpeed * HC.upgradeEffect.engine(s.up[vid].engine | 0) / HC.PPM * 3.6) + ' км/ч</b></div>' +
           '<div class="stat"><span>' + ic('fuel', 'sm') + 'бак</span><b>' + tank + ' с хода</b></div>' +
           '<div class="stat"><span>' + ic('susp', 'sm') + 'колесо</span><b>' +
           Math.round(v.wheel.r * 2 / HC.PPM * 100) + ' см</b></div>' +
@@ -299,7 +302,7 @@ window.HC = window.HC || {};
           html += '<div class="card' + (owned ? '' : ' locked') + '">' + vehiclePic(id) +
             '<div class="card-main"><h3>' + v.name + '</h3><p>' + v.about + '</p>' +
             '<p class="muted">' + (v.axles.length > 2 ? v.axles.length + ' оси · ' : '') +
-            'бак на ' + Math.round(v.fuel / v.burn) + ' с · привод ' +
+            'бак на ' + Math.round(v.fuel / (v.burn * HC.ECON.fuelBurn)) + ' с · привод ' +
             (HC.DRIVE[v.drive] || HC.DRIVE.all).name.toLowerCase() + ' · масса ' + v.mass + '</p></div>' +
             '<div class="card-side">' +
             (active ? '<span class="done">выбрана</span>'
@@ -550,15 +553,27 @@ window.HC = window.HC || {};
           '<div class="stat"><span>' + ic('coin', 'sm') + 'монеты на трассе</span><b>' + money(r.coinsRaw) + '</b></div>' +
           '<div class="stat"><span>' + ic('road', 'sm') + 'за расстояние</span><b>' + money(r.distCoins) + '</b></div>' +
           (r.bonus ? '<div class="stat"><span>' + ic('trophy', 'sm') + 'бонус за рекорд</span><b>' + money(r.bonus) + '</b></div>' : '') +
+          (r.medalBonus ? '<div class="stat"><span>' + ic('medal', 'sm') + 'за новые медали</span><b>' + money(r.medalBonus) + '</b></div>' : '') +
           (r.flips ? '<div class="stat"><span>' + ic('flip', 'sm') + 'сальто</span><b>' + r.flips + '</b></div>' : '') +
+          (r.cleanLandings ? '<div class="stat"><span>мягкие посадки</span><b>' + r.cleanLandings +
+            (r.bestStreak > 1 ? ' · серия ' + r.bestStreak : '') + '</b></div>' : '') +
+          (r.mission ? '<div class="mission-result">' + ic('check', 'sm') + r.mission + ' — выполнено</div>' : '') +
           (r.cans ? '<div class="stat"><span>' + ic('fuel', 'sm') + 'канистр подобрано</span><b>' + r.cans + '</b></div>' : '') +
           (r.ore ? '<div class="stat"><span>' + ic('ore', 'sm') + 'руда</span><b>' + money(r.ore) + '</b></div>' : '') +
           '<div class="stat total"><span>' + ic('coin') + 'всего монет</span><b>' + money(r.total) + '</b></div>' +
           '<div class="row"><button class="btn main wide" data-again>Ещё заезд</button>' +
-          '<button class="btn wide" data-home>На базу</button></div>';
+          '<button class="btn wide" data-home>В долину</button></div>' +
+          '<div class="row"><button class="btn wide" data-garage>Улучшить машину</button>' +
+          '<button class="btn wide" data-tracks>Выбрать трассу</button></div>';
         return {
           title: 'Заезд окончен', html: html,
           bind: function (root) {
+            root.querySelector('[data-garage]').addEventListener('click', function () {
+              HC.Audio.click(); UI.close(); G.goBase(); UI.openGarage();
+            });
+            root.querySelector('[data-tracks]').addEventListener('click', function () {
+              HC.Audio.click(); UI.close(); G.goBase(); UI.openTracks();
+            });
             root.querySelector('[data-again]').addEventListener('click', function () {
               HC.Audio.click(); UI.close(); G.startRide(G.lastTrack);
             });
