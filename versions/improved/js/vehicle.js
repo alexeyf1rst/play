@@ -410,7 +410,6 @@ window.HC = window.HC || {};
 
   /* --- Рисование ------------------------------------------ */
   Vehicle.prototype.draw = function (g, P) {
-    if (P.vivid && HC.Art) { HC.Art.vehicle(g, P, this); return; }
     var self = this;
 
     // тень на земле: чем выше машина, тем бледнее и шире

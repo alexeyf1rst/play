@@ -302,7 +302,7 @@ window.HC = window.HC || {};
           html += '<div class="card' + (owned ? '' : ' locked') + '">' + vehiclePic(id) +
             '<div class="card-main"><h3>' + v.name + '</h3><p>' + v.about + '</p>' +
             '<p class="muted">' + (v.axles.length > 2 ? v.axles.length + ' оси · ' : '') +
-            'бак на ' + Math.round(v.fuel / (v.burn * HC.ECON.fuelBurn)) + ' с · привод ' +
+            'бак на ' + Math.round(v.fuel / v.burn) + ' с · привод ' +
             (HC.DRIVE[v.drive] || HC.DRIVE.all).name.toLowerCase() + ' · масса ' + v.mass + '</p></div>' +
             '<div class="card-side">' +
             (active ? '<span class="done">выбрана</span>'

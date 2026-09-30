@@ -237,3 +237,24 @@ test('Stock vehicles remain finite on all five tracks', () => {
     }
   }
 });
+
+test('The bright edition grants a starter village once, without overwriting built villages', () => {
+  const state=H.defaultState();
+  assert.equal(H.Economy.welcomeVillage(state),true);
+  assert.equal(state.base.plots[0].type,'mine');
+  assert.equal(state.base.plots[2].type,'garden');
+  state.base.plots[0]=null;
+  assert.equal(H.Economy.welcomeVillage(state),false);
+  assert.equal(state.base.plots[0],null);
+  const old=H.defaultState();old.base.plots[0]={type:'drill',level:4};
+  assert.equal(H.Economy.welcomeVillage(old),false);
+  assert.equal(old.base.plots[0].type,'drill');assert.equal(old.base.plots[0].level,4);
+});
+
+test('The new building hit area includes the roof of the taller sprite', () => {
+  const state=H.defaultState();state.base.plots[0]={type:'mine',level:1};
+  H.Art={};H.Base.cam={x:0,y:0};H.Base.zoom=1;H.Base.W=1000;H.Base.H=800;
+  const spot=H.Base.places()[0],screen=H.Base.toScreen(spot.x,spot.y-194);
+  assert.equal(H.Base.hitTest(screen.x,screen.y,state),0);
+  delete H.Art;
+});

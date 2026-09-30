@@ -652,23 +652,11 @@ window.HC = window.HC || {};
       g.stroke();
       g.globalAlpha = 1;
     }
-    if (P.vivid && quality !== 'low') {
-      var rockStart = Math.floor((cam.x - W / cam.z) / 92) * 92;
-      for (var rx = rockStart; rx < cam.x + W / cam.z; rx += 92) {
-        var px = (rx - cam.x) * cam.z + W / 2;
-        var py = (this.height(rx) - cam.y) * cam.z + H / 2;
-        for (var row = 0; row < 3; row++) {
-          var n = hash(Math.floor(rx / 92) + row * 61, this.seed + 983);
-          g.fillStyle = row % 2 ? '#f1b96744' : '#55352630';
-          g.beginPath();g.ellipse(px + n * 45 * cam.z, py + (58 + row * 76 + n * 24) * cam.z, (5 + n * 7) * cam.z, (3 + n * 4) * cam.z, n, 0, 6.3);g.fill();
-        }
-      }
-    }
     g.restore();
 
     // сама кромка
-    g.strokeStyle = P.vivid ? (P.grassDeep || P.groundDeep) : P.ink;
-    g.lineWidth = P.vivid ? 1.2 : 3;
+    g.strokeStyle = P.ink;
+    g.lineWidth = 3;
     g.lineJoin = 'round';
     trace(0);
     g.stroke();

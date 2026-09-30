@@ -20,15 +20,6 @@ window.HC = window.HC || {};
        Постройка и улучшение не появляются по щелчку: на них уходит
        время, и оно идёт, даже когда игра закрыта. Пока идёт улучшение,
        постройка продолжает работать на прежнем уровне. */
-    // A one-time starter village makes the new edition playable from its first visit.
-    welcomeVillage: function (state) {
-      if (state.villageWelcome) return false;
-      state.villageWelcome = true;
-      if (state.base.plots.some(function (plot) { return !!plot; })) return false;
-      state.base.plots[0] = { type: 'mine', level: 1 };
-      state.base.plots[2] = { type: 'garden', level: 1 };
-      return true;
-    },
     buildLeft: function (plot, at) {
       if (!plot || !plot.build) return 0;
       return Math.max(0, (plot.build.end - (at || Date.now())) / 1000);
@@ -293,7 +284,7 @@ window.HC = window.HC || {};
 
   /* Дымка вглубь: дальние объекты выцветают к небу */
   function depthFade(gx, gy) {
-    return (1 - (gx + gy) / (COLS + ROWSN)) * 0.14;
+    return (1 - (gx + gy) / (COLS + ROWSN)) * 0.32;
   }
 
   /* Ступень постройки: чем выше уровень, тем больше на участке всего.
@@ -440,11 +431,8 @@ window.HC = window.HC || {};
         var idx = order[k], s = spots[idx];
         var plot = state.base.plots[idx];
         if (plot) {
-          var vivid = state.settings.theme === 'color' && HC.Art;
-          var size = 202 * 1.18 * (1 + 0.04 * tier(plot.level));
-          var hh = vivid ? size * 0.86 + 13 : 50 + 120 * (1 + 0.1 * tier(plot.level));
-          var half = vivid ? size / 2 : 88;
-          if (w.x > s.x - half && w.x < s.x + half + 6 && w.y > s.y - hh && w.y < s.y + 22) return idx;
+          var hh = 50 + 120 * (1 + 0.1 * tier(plot.level));
+          if (w.x > s.x - 88 && w.x < s.x + 94 && w.y > s.y - hh && w.y < s.y + 18) return idx;
         }
         var t0 = unIso(w.x, w.y - TH * 0.5);
         if (t0.gx >= s.gx && t0.gx < s.gx + 2 && t0.gy >= s.gy && t0.gy < s.gy + 2) return idx;
@@ -711,7 +699,7 @@ window.HC = window.HC || {};
 
       g.save();
       g.strokeStyle = P.hatch;
-      g.globalAlpha = P.vivid ? 0.045 : 0.14;
+      g.globalAlpha = 0.14;
       g.lineWidth = 1;
       g.beginPath();
       for (gx = 0; gx <= COLS; gx++) {
@@ -1447,7 +1435,6 @@ window.HC = window.HC || {};
        видно ровно то, что появится в долине. */
     thumb: function (type, P, W, H) {
       this._thumbs = this._thumbs || {};
-      if (P.vivid && HC.Art) return HC.Art.ensure(type).src;
       var key = type + '|' + W + '|' + P.ink;
       if (this._thumbs[key]) return this._thumbs[key];
 
@@ -1512,17 +1499,6 @@ window.HC = window.HC || {};
       // подскок после стройки: постройка «садится» на место
       var pp = this.pops[s.i] || 0;
       if (pp > 0) grow *= 1 + Math.sin(Math.PI * (1 - pp)) * 0.13;
-
-      if (P.vivid && HC.Art && HC.Art.ensure(type).complete && HC.Art.images[type].naturalWidth) {
-        if (site) this.drawScaffold(g, s, P, false);
-        g.save(); g.globalAlpha = 1 - (s.fade || 0) * 0.3;
-        HC.Art.building(g, type, s.x, s.y - 13 * sc, 202 * sc * grow, flip < 0);
-        g.restore();
-        if (site) this.drawScaffold(g, s, P, true);
-        this.drawBadge(g, s.x, s.y + 13 * sc, level, P, sc);
-        if (site) this.drawBuildBar(g, s.x, s.y + 32 * sc, HC.Economy.buildProgress(plot), P, sc);
-        return;
-      }
 
       // тень ромбом по плитке
       g.save();

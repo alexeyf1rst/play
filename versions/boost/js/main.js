@@ -10,13 +10,12 @@ window.HC = window.HC || {};
        по кромке земли дёрн, под ним грунт, машина красная. Формы и
        обводки те же, что и в тихих темах. */
     color: {
-      vivid: true,
-      sky0: '#37b9fa', sky1: '#c4f3ff',
+      sky0: '#5cb7e8', sky1: '#d6f0fb',
       cloud: '#ffffff', sun: '#fff2a8', sunGlow: 'rgba(255,238,150,0.5)',
-      far0: '#8ee4ad', far1: '#53c978', far2: '#32a965',
-      grass: '#60c932', grassHi: '#a1ec49', grassDeep: '#288e32',
-      ground: '#bd8045', groundTop: '#60c932', groundDeep: '#754831',
-      hatch: '#8a5c31', ink: '#3d5239',
+      far0: '#9ed0ae', far1: '#79b98e', far2: '#5ea277',
+      grass: '#59b247', grassHi: '#71cb59', grassDeep: '#3b8733',
+      ground: '#b57c44', groundTop: '#59b247', groundDeep: '#7a5026',
+      hatch: '#8a5c31', ink: '#2a2018',
       bodyFill: '#f7f2e7', bodyHi: '#fffdf7', bodyShade: '#ddd2be',
       carFill: '#e04a3b', carHi: '#f4705f', carShade: '#a72e25',
       driver: '#f6dcb8', tyre: '#2a2724', tyreHi: '#4c453d',
@@ -24,15 +23,15 @@ window.HC = window.HC || {};
       coin: '#f5c33f', coinHi: '#ffe484',
       can: '#d94a38', canHi: '#f07a68',
       dust: '#caa877',
-      leaf: '#60c933', leafHi: '#a0ef53', leafDeep: '#208434',
+      leaf: '#57ad4b', leafHi: '#6ec95c', leafDeep: '#3a8232',
       stone: '#a9a49b', stoneHi: '#c6c1b8', stoneDeep: '#7b766d',
       wood: '#9c6b3f', woodHi: '#ba8452', woodDeep: '#6d4826',
       bone: '#efe6d6', metal: '#bcc1c7', panel: '#f4f0e8',
       shadow: 'rgba(30,40,20,0.24)', vignette: 'rgba(20,50,70,0.10)',
-      fore: '#2f6b2c', panelSolid: '#ffffff', sideFace: '#588b3c',
+      fore: '#2f6b2c', panelSolid: '#ffffff', sideFace: '#a2793f',
       road: '#6e7276', roadLine: '#f7f6f2',
       // долина: трава, натоптанные дорожки и земляные площадки под постройки
-      plate: '#70cf3b', plateDeep: '#43ad35', path: '#efcf91', pad: '#7bc043'
+      plate: '#69b94f', plateDeep: '#4b9a38', path: '#e2cf9e', pad: '#b9834c'
     },
     paper: {
       sky0: '#f4f2ee', sky1: '#e2dfd8',
@@ -73,8 +72,6 @@ window.HC = window.HC || {};
       HC.setDiff(this.state.settings.diff);
       this.applyTheme();
 
-      HC.Economy.welcomeVillage(this.state);
-      if (HC.Art) HC.Art.init(this.state);
       HC.UI.init(this);
       HC.Audio.applySettings(this.state.settings);
 
@@ -123,7 +120,7 @@ window.HC = window.HC || {};
       HC.Base._thumbs = {};      // картинки перерисуются под новую тему
       HC.Base._fill = null;      // и градиент корпуса тоже
       var meta = document.querySelector('meta[name="theme-color"]');
-      var bar = { dark: '#0f1012', color: '#37b9fa', paper: '#f4f2ee' }[name];
+      var bar = { dark: '#0f1012', color: '#5cb7e8', paper: '#f4f2ee' }[name];
       if (meta) meta.setAttribute('content', bar);
     },
 
@@ -207,10 +204,6 @@ window.HC = window.HC || {};
       document.getElementById('btn-rescue-finish').addEventListener('click', function () { HC.Ride.giveUp(); });
       document.getElementById('btn-pause').addEventListener('click', function () { self.togglePause(); });
       document.getElementById('btn-play').addEventListener('click', function () { self.startFromTitle(); });
-      document.getElementById('btn-village').addEventListener('click', function () {
-        HC.Audio.unlock();
-        self.fadeTo(function () { document.getElementById('title').hidden = true; self.goBase(); });
-      });
       document.getElementById('btn-title-settings').addEventListener('click', function () {
         HC.Audio.unlock(); HC.UI.openSettings();
       });
@@ -312,7 +305,8 @@ window.HC = window.HC || {};
       document.getElementById('top').hidden = true;
       document.getElementById('pending').hidden = true;
 
-      var pick = 'hills';
+      var open = Object.keys(HC.TRACKS).filter(function (t) { return true; });
+      var pick = open[(Math.random() * open.length) | 0];
       HC.Ride.start(this, pick, true);
 
       var st = this.state.stats;

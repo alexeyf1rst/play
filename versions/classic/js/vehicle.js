@@ -113,36 +113,24 @@ window.HC = window.HC || {};
     this.reset(80);
   }
 
-  Vehicle.prototype.reset = function (x, align) {
+  Vehicle.prototype.reset = function (x) {
     var gy = this.terrain.height(x);
     this.pos = { x: x, y: gy - this.def.wheel.r - this.suspRest - this.def.axles[0].y };
     this.vel = { x: 0, y: 0 };
-    this.ang = align ? Math.atan(this.terrain.slope(x)) : 0;
+    this.ang = 0;
     this.angVel = 0;
     this.fuel = this.maxFuel;
     this.crashed = false;
     this.stopped = false;
-    this.onGround = false;
-    this.upT = 0;
     this.airTime = 0;
     this.airT = 0;
     this.spinAccum = 0;
     this.distance = 0;
     this.startX = x;
     var self = this;
-    if (align) {
-      // Кузов и колёса ставятся вдоль поверхности, без начального удара
-      // подвески об склон при возвращении после аварии.
-      var c = Math.cos(this.ang), sn = Math.sin(this.ang);
-      this.pos.y = Math.min.apply(null, this.wheels.map(function (w) {
-        var wx = x + w.lx * c - (w.ly + self.suspRest) * sn;
-        return self.terrain.height(wx) - w.r - w.lx * sn - (w.ly + self.suspRest) * c;
-      }));
-    }
     this.wheels.forEach(function (w) {
-      var pt = self.worldPoint(w.lx, w.ly + self.suspRest);
-      w.pos.x = pt.x;
-      w.pos.y = pt.y;
+      w.pos.x = self.pos.x + w.lx;
+      w.pos.y = self.pos.y + w.ly + self.suspRest;
       w.vel.x = 0; w.vel.y = 0;
       w.spin = 0; w.spinAngle = 0; w.contact = false;
     });
@@ -389,10 +377,8 @@ window.HC = window.HC || {};
     else this.recover();
 
     // топливо
-    if (!this.crashed && this.fuel > 0 &&
-        (Math.abs(input.throttle) > 0 || !this.onGround || Math.abs(this.vel.x) > 8)) {
-      var use = this.def.burn * this.burnK * HC.ECON.fuelBurn *
-                (0.25 + 0.75 * Math.abs(input.throttle)) * dt;
+    if (!this.crashed && this.fuel > 0) {
+      var use = this.def.burn * this.burnK * (0.45 + 0.55 * Math.abs(input.throttle)) * dt;
       this.fuel = Math.max(0, this.fuel - use);
     }
     // полёт и сальто
@@ -410,7 +396,6 @@ window.HC = window.HC || {};
 
   /* --- Рисование ------------------------------------------ */
   Vehicle.prototype.draw = function (g, P) {
-    if (P.vivid && HC.Art) { HC.Art.vehicle(g, P, this); return; }
     var self = this;
 
     // тень на земле: чем выше машина, тем бледнее и шире
