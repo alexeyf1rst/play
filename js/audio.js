@@ -295,7 +295,7 @@ window.HC = window.HC || {};
     },
 
     suspend: function () { if (ctx && ctx.state === 'running') ctx.suspend(); },
-    resume: function () { if (ctx && ctx.state === 'suspended' && settings.music) ctx.resume(); },
+    resume: function () { if (ctx && ctx.state === 'suspended' && (settings.music || settings.sfx)) ctx.resume(); },
 
     /* --- Короткие звуки. Все мягкие, без резких атак ------ */
     blip: function (freq, dur, vol, type) {

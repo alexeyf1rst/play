@@ -69,6 +69,12 @@ window.HC = window.HC || {};
       this.canvas = document.getElementById('scene');
       this.g = this.canvas.getContext('2d');
       this.state = HC.load();
+      this.reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      if (window.matchMedia) {
+        var motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        var motionChange = function (e) { HC.Game.reducedMotion = e.matches; };
+        if (motionQuery.addEventListener) motionQuery.addEventListener('change', motionChange);
+      }
       HC.setDiff(this.state.settings.diff);
       this.applyTheme();
 
@@ -97,15 +103,25 @@ window.HC = window.HC || {};
         if (HC.Quests.ensure(self.state).length) HC.UI.toast('Появились новые задания');
         HC.UI.refreshQuestBadge();
         HC.save(self.state);
+        if (HC.UI.refreshStorageStatus) HC.UI.refreshStorageStatus();
       }, 10000);
-      this.onUnload = function () { HC.save(self.state, true); };
-      window.addEventListener('beforeunload', this.onUnload);
-      document.addEventListener('visibilitychange', function () {
-        if (document.hidden) { HC.save(self.state, true); HC.Audio.suspend(); }
-        else HC.Audio.resume();
+      this.onUnload = function () {
+        self.pauseForFocus();
+        self.settleEconomy(true);
+        HC.save(self.state, true);
+      };
+      window.addEventListener('pagehide', this.onUnload);
+      document.addEventListener('visibilitychange', this.handleVisibility.bind(this));
+      window.addEventListener('pageshow', function (e) { if (e.persisted) self.handleVisibility(); });
+      window.addEventListener('storage', function (e) {
+        if (e.key !== HC.SAVE_KEY && e.key !== null) return;
+        var status = HC.storageStatus ? HC.storageStatus() : {};
+        if (status.conflict) self.pauseForFocus();
+        if (HC.UI.refreshStorageStatus) HC.UI.refreshStorageStatus();
       });
 
       this.pendingOffline = (Math.floor(this.state.base.pending.coins) >= 1 && off.seconds > 120) ? off : null;
+      if (HC.UI.refreshStorageStatus) HC.UI.refreshStorageStatus();
     },
 
     /* --- Тема и размеры ----------------------------------- */
@@ -138,10 +154,25 @@ window.HC = window.HC || {};
       this.input = { throttle: 0 };
 
       function keyFlag(e, down) {
+        if (!down) {
+          // Отпускание должно очистить газ даже после открытия окна.
+          if (/^(ArrowRight|d|D|в|В| )$/.test(e.key)) self.keys.gas = false;
+          if (/^(ArrowLeft|a|A|ф|Ф)$/.test(e.key)) self.keys.brake = false;
+          return;
+        }
+        var t = e.target;
+        if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.isComposing ||
+            (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) ||
+            (t && /^(BUTTON|A)$/.test(t.tagName) && (e.key === ' ' || e.key === 'Enter'))) return;
+        if (HC.UI.isOpen && HC.UI.isOpen()) return;
         var k = e.key;
+        if (k === 'Escape' || k === 'p' || k === 'P' || k === 'з' || k === 'З') {
+          if (!e.repeat) self.togglePause();
+          return;
+        }
+        if (self.scene !== 'ride' || HC.Ride.paused) return;
         if (k === 'ArrowRight' || k === 'd' || k === 'D' || k === 'в' || k === 'В' || k === ' ') { self.keys.gas = down; e.preventDefault(); }
         if (k === 'ArrowLeft' || k === 'a' || k === 'A' || k === 'ф' || k === 'Ф') { self.keys.brake = down; e.preventDefault(); }
-        if (down && k === 'Escape') self.togglePause();
       }
       // первое касание/нажатие где угодно — браузеру этого хватает, чтобы разрешить звук
       var unlockOnce = function () {
@@ -154,14 +185,20 @@ window.HC = window.HC || {};
 
       window.addEventListener('keydown', function (e) { keyFlag(e, true); });
       window.addEventListener('keyup', function (e) { keyFlag(e, false); });
-      window.addEventListener('blur', function () { self.keys.gas = self.keys.brake = false; });
+      window.addEventListener('blur', function () { self.pauseForFocus(); });
 
       ['brake', 'gas'].forEach(function (which) {
         var node = document.getElementById(which === 'gas' ? 'pedal-gas' : 'pedal-brake');
-        var set = function (v) { return function (e) { self.touch[which] = v; e.preventDefault(); }; };
+        var set = function (v) { return function (e) {
+          if (v && (self.scene !== 'ride' || HC.Ride.paused)) return;
+          self.touch[which] = v;
+          if (v && node.setPointerCapture && e.pointerId !== undefined) node.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        }; };
         node.addEventListener('pointerdown', set(true));
         node.addEventListener('pointerup', set(false));
         node.addEventListener('pointercancel', set(false));
+        node.addEventListener('lostpointercapture', set(false));
         node.addEventListener('pointerleave', set(false));
         // Педаль держат долго, а долгое нажатие на телефоне — это лупа,
         // выделение и «скопировать». Глушим всё это прямо на педали.
@@ -173,7 +210,8 @@ window.HC = window.HC || {};
       ['contextmenu', 'selectstart', 'dragstart'].forEach(function (ev) {
         document.addEventListener(ev, function (e) {
           var t = e.target;
-          if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+          if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' ||
+                    (t.closest && t.closest('#modal')))) return;
           e.preventDefault();
         });
       });
@@ -239,7 +277,11 @@ window.HC = window.HC || {};
         if (i >= 0) { HC.Audio.click(); HC.Base.pingPad(i); HC.UI.openPlot(i); }
       }
       c.addEventListener('pointerup', endPtr);
-      c.addEventListener('pointercancel', endPtr);
+      c.addEventListener('pointercancel', function (e) {
+        delete ptrs[e.pointerId];
+        if (count() < 2) pinch = null;
+        HC.Base.dragging = count() > 0;
+      });
 
       c.addEventListener('wheel', function (e) {
         if (self.scene !== 'base') return;
@@ -257,10 +299,53 @@ window.HC = window.HC || {};
     },
 
     readInput: function () {
+      if (this.scene !== 'ride' || HC.Ride.paused || (HC.UI.isOpen && HC.UI.isOpen())) {
+        this.input.throttle = 0;
+        return this.input;
+      }
       var gas = this.keys.gas || this.touch.gas;
       var brake = this.keys.brake || this.touch.brake;
       this.input.throttle = (gas ? 1 : 0) + (brake ? -1 : 0);
       return this.input;
+    },
+
+    clearInput: function () {
+      this.keys.gas = this.keys.brake = false;
+      this.touch.gas = this.touch.brake = false;
+      this.input.throttle = 0;
+    },
+
+    pauseForFocus: function () {
+      this.clearInput();
+      if (this.scene === 'ride' && HC.Ride.active && !HC.Ride.paused) this.togglePause();
+    },
+
+    handleVisibility: function () {
+      if (document.hidden) {
+        this.pauseForFocus();
+        this.settleEconomy(true);
+        HC.save(this.state, true);
+        HC.Audio.suspend();
+        return;
+      }
+      this.last = performance.now();
+      this.accum = 0;
+      HC.Quests.ensure(this.state);
+      var off = HC.Economy.applyOffline(this.state);
+      if (off.done.length) this.onBuilt(off.done);
+      HC.UI.refreshTop();
+      HC.UI.refreshPending();
+      HC.save(this.state, true);
+      if (HC.UI.refreshStorageStatus) HC.UI.refreshStorageStatus();
+      HC.Audio.resume();
+    },
+
+    settleEconomy: function (online) {
+      var elapsed = Math.max(0, (Date.now() - this.state.base.lastTick) / 1000);
+      var got = HC.Economy.accrue(this.state, elapsed, online);
+      if (got.done.length) this.onBuilt(got.done);
+      if (this.scene === 'base') HC.UI.refreshPending();
+      return got;
     },
 
     /* --- Сцены -------------------------------------------- */
@@ -293,6 +378,7 @@ window.HC = window.HC || {};
 
     /* Плавный переход между сценами */
     fadeTo: function (fn) {
+      if (this.reducedMotion) { fn(); return; }
       var f = document.getElementById('fade');
       f.classList.add('on');
       setTimeout(function () {
@@ -319,6 +405,7 @@ window.HC = window.HC || {};
     },
 
     goBase: function () {
+      this.clearInput();
       this.scene = 'base';
       HC.Ride.stop();
       document.getElementById('ride-hud').hidden = true;
@@ -339,6 +426,7 @@ window.HC = window.HC || {};
     },
 
     beginRide: function (trackId) {
+      this.clearInput();
       this.lastTrack = trackId;
       this.state.track = trackId;
       this.scene = 'ride';
@@ -362,10 +450,16 @@ window.HC = window.HC || {};
 
     togglePause: function () {
       if (this.scene !== 'ride' || !HC.Ride.active) return;
+      this.clearInput();
       if (HC.Ride.paused) { HC.Ride.paused = false; HC.UI.close(); return; }
       HC.Ride.paused = true;
+      HC.Audio.engineStop();
       var self = this;
-      HC.UI.onClose = function () { HC.Ride.paused = false; };
+      HC.UI.onClose = function () {
+        self.clearInput();
+        HC.Ride.paused = false;
+        if (self.scene === 'ride' && HC.Ride.active) HC.Audio.engineStart();
+      };
       HC.UI.open(function () {
         return {
           title: 'Пауза', html:
@@ -414,7 +508,7 @@ window.HC = window.HC || {};
        иначе перезагрузка вернула бы стёртый сейв на место. */
     hardReset: function () {
       clearInterval(this.saveTimer);
-      window.removeEventListener('beforeunload', this.onUnload);
+      window.removeEventListener('pagehide', this.onUnload);
       HC.Audio.stop();
       var removed = HC.wipe();
       this.state = HC.defaultState();
@@ -425,18 +519,26 @@ window.HC = window.HC || {};
     replaceState: function (st) {
       this.state = st;
       HC.setDiff(st.settings.diff);
+      HC.Quests.ensure(st);
+      HC.Economy.applyOffline(st);
+      this.accum = 0;
+      this.last = performance.now();
+      this.pendingOffline = null;
+      this.lastTrack = st.track;
       this.applyTheme();
       HC.Audio.applySettings(st.settings);
-      HC.save(st, true);
       HC.UI.refreshTop();
       HC.UI.refreshPending();
       HC.UI.syncSound();
+      document.getElementById('title').hidden = true;
       this.goBase();
+      if (HC.UI.refreshStorageStatus) HC.UI.refreshStorageStatus();
     },
 
     /* --- Кадр --------------------------------------------- */
     frame: function (now) {
       requestAnimationFrame(this.frame.bind(this));
+      if (document.hidden) { this.last = now; return; }
       var dt = Math.min((now - this.last) / 1000, 0.05);
       this.last = now;
 
@@ -444,7 +546,7 @@ window.HC = window.HC || {};
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
       if (this.scene === 'title' || this.scene === 'ride') {
-        HC.Ride.update(dt, this.readInput());
+        if (this.scene !== 'title' || !this.reducedMotion) HC.Ride.update(dt, this.readInput());
         if (HC.Ride.active || HC.Ride.phase === 'ending') HC.Ride.draw(g, this.W, this.H, this.P);
         if (this.scene === 'ride') this.updateRideHud();
       } else {
@@ -455,11 +557,9 @@ window.HC = window.HC || {};
       // добыча копится и на базе, и в заезде
       this.accum += dt;
       if (this.accum >= 1) {
-        var got = HC.Economy.accrue(this.state, this.accum, true);
+        this.state.stats.playTime += this.accum;
         this.accum = 0;
-        this.state.stats.playTime += 1;
-        if (got.done && got.done.length) this.onBuilt(got.done);
-        if (this.scene === 'base') HC.UI.refreshPending();
+        this.settleEconomy(true);
       }
     },
 
@@ -487,6 +587,8 @@ window.HC = window.HC || {};
       var pct = Math.max(0, car.fuel / car.maxFuel * 100);
       var bar = document.getElementById('fuel-bar');
       bar.style.width = pct.toFixed(1) + '%';
+      bar.parentNode.setAttribute('aria-valuenow', Math.round(pct));
+      bar.parentNode.setAttribute('aria-valuetext', 'Топливо: ' + Math.round(pct) + '%');
       bar.parentNode.classList.toggle('low', pct < 20);
       var d = Math.floor(car.distance);
       if (d !== this._d) { document.getElementById('dist').textContent = d + ' м'; this._d = d; }

@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Тихие холмы</title>
 <meta name="description" content="Браузерная игра на двоих жанров: холмы с настоящей физикой подвески и долина с шахтами, которые работают, пока тебя нет. Без установки, с телефона и с компьютера.">
 <meta name="theme-color" content="#5cb7e8">
@@ -86,7 +86,7 @@
 <symbol id="i-beaker" viewBox="0 0 24 24"><path d="M9 3v7L4.6 18.4A1.6 1.6 0 0 0 6 20.8h12a1.6 1.6 0 0 0 1.4-2.4L15 10V3"/><path d="M7.5 3h9M6.6 14.5h10.8"/></symbol>
 </svg>
 
-<canvas id="scene"></canvas>
+<canvas id="scene" aria-label="Долина и трасса игры. Постройки доступны через кнопку «База», управление заездом — стрелками или педалями."></canvas>
 
 <!-- Экран запуска. За ним по-настоящему едет машина. -->
 <div id="title">
@@ -95,11 +95,11 @@
     <p class="tagline">холмы · монеты · шахты в долине</p>
   </div>
   <div class="title-bottom">
-    <button id="btn-play" class="btn main go"><svg class="i"><use href="#i-play"/></svg>Играть</button>
+    <button id="btn-play" class="btn main go"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Играть</button>
     <p id="title-stats" class="title-stats" hidden></p>
     <div class="title-row">
-      <button id="btn-title-sound" class="icon-btn" title="Музыка" aria-label="Музыка"><svg class="i"><use href="#i-sound"/></svg></button>
-      <button id="btn-title-settings" class="icon-btn" title="Настройки" aria-label="Настройки"><svg class="i"><use href="#i-settings"/></svg></button>
+      <button id="btn-title-sound" class="icon-btn" title="Музыка" aria-label="Музыка"><svg class="i" aria-hidden="true"><use href="#i-sound"/></svg></button>
+      <button id="btn-title-settings" class="icon-btn" title="Настройки" aria-label="Настройки"><svg class="i" aria-hidden="true"><use href="#i-settings"/></svg></button>
     </div>
   </div>
 </div>
@@ -107,26 +107,27 @@
 <div id="fade"></div>
 
 <header id="top">
-  <div class="res"><svg class="i"><use href="#i-coin"/></svg><b id="coins">0</b></div>
-  <div class="res"><svg class="i"><use href="#i-ore"/></svg><b id="ore">0</b></div>
+  <div class="res" role="group" id="coins-balance" aria-label="Монеты: 0"><svg class="i" aria-hidden="true"><use href="#i-coin"/></svg><b id="coins" aria-hidden="true">0</b></div>
+  <div class="res" role="group" id="ore-balance" aria-label="Руда: 0"><svg class="i" aria-hidden="true"><use href="#i-ore"/></svg><b id="ore" aria-hidden="true">0</b></div>
   <div class="spacer"></div>
-  <button id="btn-fit" class="icon-btn" title="Вся база" aria-label="Вся база"><svg class="i"><use href="#i-fit"/></svg></button>
-  <button id="btn-sound" class="icon-btn" title="Музыка" aria-label="Музыка"><svg class="i"><use href="#i-sound"/></svg></button>
-  <button id="btn-settings" class="icon-btn" title="Настройки" aria-label="Настройки"><svg class="i"><use href="#i-settings"/></svg></button>
+  <button id="btn-base" class="btn compact" aria-label="База — список участков и построек"><svg class="i" aria-hidden="true"><use href="#i-mine"/></svg>База</button>
+  <button id="btn-fit" class="icon-btn" title="Вся база" aria-label="Вся база"><svg class="i" aria-hidden="true"><use href="#i-fit"/></svg></button>
+  <button id="btn-sound" class="icon-btn" title="Музыка" aria-label="Музыка"><svg class="i" aria-hidden="true"><use href="#i-sound"/></svg></button>
+  <button id="btn-settings" class="icon-btn" title="Настройки" aria-label="Настройки"><svg class="i" aria-hidden="true"><use href="#i-settings"/></svg></button>
 </header>
 
 <button id="pending" hidden></button>
 
 <!-- Низ экрана разложен по смыслу: слева то, во что вкладываешь,
      по центру главное действие, справа цели. -->
-<nav id="base-bar">
+<nav id="base-bar" aria-label="Действия в долине">
   <div class="bar-zone left">
-    <button id="btn-garage" class="btn"><svg class="i"><use href="#i-garage"/></svg>Гараж</button>
-    <button id="btn-shop" class="btn"><svg class="i"><use href="#i-shop"/></svg>Магазин</button>
+    <button id="btn-garage" class="btn"><svg class="i" aria-hidden="true"><use href="#i-garage"/></svg>Гараж</button>
+    <button id="btn-shop" class="btn"><svg class="i" aria-hidden="true"><use href="#i-shop"/></svg>Магазин</button>
   </div>
-  <button id="btn-ride" class="btn main go"><svg class="i"><use href="#i-play"/></svg>Поехать</button>
+  <button id="btn-ride" class="btn main go"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Поехать</button>
   <div class="bar-zone right">
-    <button id="btn-quests" class="btn"><svg class="i"><use href="#i-quests"/></svg>Задания<b id="quest-badge" hidden>0</b></button>
+    <button id="btn-quests" class="btn"><svg class="i" aria-hidden="true"><use href="#i-quests"/></svg>Задания<b id="quest-badge" hidden>0</b></button>
   </div>
 </nav>
 
@@ -134,15 +135,15 @@
   <!-- Слева расход, по центру главное число, справа заработок и пауза -->
   <div id="ride-top">
     <div class="hud-zone left">
-      <div id="fuel-wrap"><i id="fuel-bar"></i></div>
+      <div id="fuel-wrap" role="progressbar" aria-label="Топливо" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-valuetext="100 процентов"><i id="fuel-bar"></i></div>
       <span class="hud-cap">топливо</span>
     </div>
     <div class="hud-zone center">
       <span id="dist">0 м</span>
     </div>
     <div class="hud-zone right">
-      <span class="run-coins"><svg class="i"><use href="#i-coin"/></svg><span id="run-coins">0</span></span>
-      <button id="btn-pause" class="icon-btn" title="Пауза" aria-label="Пауза"><svg class="i"><use href="#i-pause"/></svg></button>
+      <span class="run-coins"><svg class="i" aria-hidden="true"><use href="#i-coin"/></svg><span class="sr-only">Монет за заезд: </span><span id="run-coins">0</span></span>
+      <button id="btn-pause" class="icon-btn" title="Пауза" aria-label="Пауза"><svg class="i" aria-hidden="true"><use href="#i-pause"/></svg></button>
     </div>
   </div>
   <div id="pedals">
@@ -152,13 +153,17 @@
 </div>
 
 <div id="modal" hidden>
-  <div class="sheet">
-    <header><h2 id="modal-title"></h2><button id="modal-close" aria-label="Закрыть">&times;</button></header>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
+    <header><h2 id="modal-title" tabindex="-1"></h2><button id="modal-close" aria-label="Закрыть окно">&times;</button></header>
     <div id="modal-body"></div>
   </div>
 </div>
 
-<div id="toast"></div>
+<aside id="storage-warning" role="status" aria-live="polite" hidden>
+  <span id="storage-warning-text"></span>
+  <button id="btn-storage-export" class="btn compact">Сохранить в файл</button>
+</aside>
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script src="js/data.js"></script>
 <script src="js/storage.js"></script>
@@ -170,6 +175,7 @@
 <script src="js/ride.js"></script>
 <script src="js/base.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/pwa.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
