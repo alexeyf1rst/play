@@ -81,11 +81,11 @@ window.HC = window.HC || {};
         var force = Math.min(1, (fallV - 240) / 900);
         // на заставке трясти незачем — там просто спокойно едет машина,
         // и тряску можно выключить в настройках
-        if (!this.demo && this.game.state.settings.shake !== false) {
+        if (!this.demo && !this.game.reducedMotion && this.game.state.settings.shake !== false) {
           this.shake = Math.max(this.shake, 0.35 + force * 0.65);
         }
         HC.Audio.land(force);
-        if (!this.game.state.settings.calmMode) {
+        if (!this.game.state.settings.calmMode && !this.game.reducedMotion) {
           // хлопок по земле: расходящееся кольцо в точке касания
           var cw = car.wheels[0];
           for (var ri = 0; ri < car.wheels.length; ri++) {
@@ -130,7 +130,7 @@ window.HC = window.HC || {};
             text: (FLIP_NAMES[Math.min(n, FLIP_NAMES.length) - 1]) + '  +' + gain
           });
           HC.Audio.flip(n);
-          if (n >= 2) this.slowT = 1;   // с двойного сальто время тянется
+          if (n >= 2 && !this.game.reducedMotion) this.slowT = 1;
         }
       } else {
         if (car.airTime === 0 && this._lastAir > HC.ECON.airMin && !car.crashed && this.airFlips === 0) {
@@ -317,12 +317,12 @@ window.HC = window.HC || {};
     fallen: function (dt) {
       var landed = this.terrain.fallLogs(dt);
       if (!landed) return;
-      var calm = this.game.state.settings.calmMode;
+      var calm = this.game.state.settings.calmMode || this.game.reducedMotion;
       for (var i = 0; i < landed.length; i++) {
         var L = landed[i];
         if (Math.abs(L.x - this.car.pos.x) > 1400) continue;   // не видно — не слышно
         HC.Audio.land(0.45);
-        if (!this.demo && this.game.state.settings.shake !== false) {
+        if (!this.demo && !this.game.reducedMotion && this.game.state.settings.shake !== false) {
           this.shake = Math.max(this.shake, 0.3);
         }
         if (calm) continue;
@@ -351,7 +351,7 @@ window.HC = window.HC || {};
       var T = this.terrain, car = this.car;
       T.settle(dt);
       if (this.phase !== 'run') return;
-      var calm = this.game.state.settings.calmMode;
+      var calm = this.game.state.settings.calmMode || this.game.reducedMotion;
       for (var i = 0; i < car.wheels.length; i++) {
         var w = car.wheels[i];
         if (!w.contact) continue;
@@ -441,7 +441,7 @@ window.HC = window.HC || {};
 
     dust: function (dt) {
       var car = this.car;
-      if (this.game.state.settings.calmMode) return;
+      if (this.game.state.settings.calmMode || this.game.reducedMotion) return;
       for (var i = 0; i < car.wheels.length; i++) {
         var w = car.wheels[i];
         if (!w.contact) continue;
@@ -486,7 +486,7 @@ window.HC = window.HC || {};
 
       // Тряска — в экранных координатах, на физику не влияет. Кадр при этом
       // чуть раздвигаем, иначе по краям вылезала бы пустота.
-      var sh = this.shake || 0;
+      var sh = this.game.reducedMotion ? 0 : (this.shake || 0);
       g.save();
       if (sh > 0.001) {
         var kz = 1 + 0.035 * sh;
@@ -642,7 +642,7 @@ window.HC = window.HC || {};
 
     /* Кусты у нижнего края экрана, идут быстрее — глубина кадра */
     drawForeground: function (g, cam, W, H, P) {
-      if (this.game.state.settings.calmMode) return;
+      if (this.game.state.settings.calmMode || this.game.reducedMotion) return;
       var k = 1.55;
       var span = 260;
       var x0 = cam.x * k;

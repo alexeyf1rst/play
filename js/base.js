@@ -187,7 +187,9 @@ window.HC = window.HC || {};
       }
       marks.sort(function (a, b) { return a - b; });
       marks.push(now);
-      var got = { coins: 0, ore: 0, done: [] }, prev = t0;
+      // При ограничении офлайна начало окна может оказаться ПОСЛЕ конца
+      // стройки. Такая шахта уже работает с первой секунды этого окна.
+      var got = { coins: 0, ore: 0, done: this.finishDue(state, t0) }, prev = t0;
       for (i = 0; i < marks.length; i++) {
         var seg = (marks[i] - prev) / 1000;
         if (seg > 0) {
@@ -233,7 +235,7 @@ window.HC = window.HC || {};
     },
     /* Что накопилось, пока игра была закрыта */
     applyOffline: function (state) {
-      var elapsed = (Date.now() - (state.base.lastTick || Date.now())) / 1000;
+      var elapsed = Math.max(0, (Date.now() - (state.base.lastTick || Date.now())) / 1000);
       var maxSec = this.offlineHours(state) * 3600;
       var used = clamp(elapsed, 0, maxSec);
       var got = this.accrue(state, used);
@@ -441,7 +443,7 @@ window.HC = window.HC || {};
     },
 
     update: function (dt) {
-      this.t += dt;
+      if (!HC.Game || !HC.Game.reducedMotion) this.t += dt;
       var i;
       for (i = this.fx.length - 1; i >= 0; i--) {
         var f = this.fx[i];
@@ -460,7 +462,7 @@ window.HC = window.HC || {};
 
     /* Сбор: монетки летят от построек к счётчику. Видно, откуда деньги. */
     burst: function (state, got) {
-      if (state.settings.calmMode) return;
+      if (state.settings.calmMode || (HC.Game && HC.Game.reducedMotion)) return;
       var spots = this.places(), self = this;
       function target(id) {
         var e = document.getElementById(id);
@@ -497,8 +499,8 @@ window.HC = window.HC || {};
     pop: function (index) {
       var spots = this.places(), s = spots[index];
       if (!s) return;
+      if (HC.Game && (HC.Game.reducedMotion || (HC.Game.state && HC.Game.state.settings.calmMode))) return;
       this.pops[index] = 1;
-      if (HC.Game && HC.Game.state && HC.Game.state.settings.calmMode) return;
       var c = this.toScreen(s.x, s.y);
       for (var i = 0; i < 14; i++) {
         var a2 = Math.random() * Math.PI * 2;
