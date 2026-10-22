@@ -1,14 +1,14 @@
 {
   "name": "Тихие холмы",
   "short_name": "Тихие холмы",
-  "description": "Спокойная чёрно-белая игра: холмы, монеты и шахты в долине.",
+  "description": "Цветущие холмы, разгон, задания и объёмная деревня. Четыре версии игры на выбор.",
   "lang": "ru",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f4f2ee",
-  "theme_color": "#f4f2ee",
+  "background_color": "#37b9fa",
+  "theme_color": "#37b9fa",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

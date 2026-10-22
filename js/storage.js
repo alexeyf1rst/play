@@ -52,7 +52,7 @@ window.HC = window.HC || {};
         collected: 0
       },
       settings: {
-        music: true,
+        music: false,
         musicVol: 0.55,
         sfx: true,
         sfxVol: 0.5,
